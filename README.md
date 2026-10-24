@@ -6,6 +6,8 @@ Toàn bộ nhận diện tay chạy trong trình duyệt. Không có backend, vi
 
 > Game giải trí lành mạnh cho 16+. Không có hình ảnh nhạy cảm. Mục đích: vui, theo trend, và vận động cơ tay.
 
+**Chơi ngay:** https://nbahao.github.io/ambatukam-game/
+
 ![Màn hình bắt đầu](docs/start.png)
 
 ## Chạy local
@@ -13,7 +15,7 @@ Toàn bộ nhận diện tay chạy trong trình duyệt. Không có backend, vi
 Không cần cài gì. Chỉ cần một HTTP server tĩnh (trình duyệt không cho mở camera từ `file://`):
 
 ```bash
-git clone <repo-url> ambatukam-game
+git clone https://github.com/NBaHao/ambatukam-game.git
 cd ambatukam-game
 python3 -m http.server 5173
 ```
@@ -111,6 +113,8 @@ MIT
 Webcam meme game: grip like you're holding a rod, stroke up and down as fast as you can. Three modes: **Single** (1 hand, timed, average strokes/sec), **Double** (2 hands, 2 rods, strokes add up), **Random** (the rod spawns at random spots and keeps relocating; chase it to keep your Heat meter up, survive as long as you can). Rank and PvP are coming soon.
 
 Hand tracking runs entirely in the browser. No backend; video never leaves the device. For fun, 16+, no explicit imagery.
+
+**Play online:** https://nbahao.github.io/ambatukam-game/
 
 **Run locally:** any static server works, e.g. `python3 -m http.server 5173`, then open http://localhost:5173. Camera access requires `localhost` or HTTPS.
 
