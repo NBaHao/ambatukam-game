@@ -398,8 +398,9 @@ function renderModeTexts() {
   for (const b of $("modes").children) b.classList.toggle("active", b.dataset.mode === mode);
   $("sub").textContent = t("sub" + mode[0].toUpperCase() + mode.slice(1));
   $("steps").innerHTML = t("steps")[mode].map((s) => `<li>${s}</li>`).join("");
-  $("durations").classList.toggle("hidden", !isTimed());
-  $("btn-keyboard").classList.toggle("hidden", mode !== "single");
+  // Dùng visibility thay vì display để không nhảy layout khi đổi chế độ
+  $("durations").classList.toggle("ghost", !isTimed());
+  $("btn-keyboard").classList.toggle("ghost", mode !== "single");
   $("power-label").textContent = t(mode === "random" ? "heat" : "power");
   renderBestLine();
 }
@@ -602,7 +603,10 @@ function onStroke(tr, now) {
   count++;
   tr.count++;
   const sec = Math.floor((now - playStart) / 1000);
-  if (isTimed() ? sec < duration : true) bins[sec] = (bins[sec] || 0) + 1;
+  if (!isTimed() || sec < duration) {
+    while (bins.length <= sec) bins.push(0);
+    bins[sec]++;
+  }
   if (mode === "random") {
     meter = Math.min(100, meter + RND_STROKE_GAIN);
     if (!rodHasStroke) { rodHasStroke = true; rodsCaught++; }
@@ -851,6 +855,8 @@ function finish() {
   beep(220, 400, 0.1, "sawtooth");
   const elapsed = (performance.now() - playStart) / 1000;
   const prev = getBest();
+  // Random: đệm đủ số giây đã chơi để biểu đồ và đỉnh tính đúng
+  if (!isTimed()) while (bins.length < Math.ceil(elapsed)) bins.push(0);
   let r;
   if (isTimed()) {
     const avg = count / duration;

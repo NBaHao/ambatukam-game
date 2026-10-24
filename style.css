@@ -120,9 +120,13 @@ button:disabled { opacity: .4; cursor: default; }
 h1 { margin: 0; font-size: 34px; font-weight: 800; letter-spacing: -.01em; }
 h2 { margin: 0; font-size: 24px; font-weight: 800; }
 .sub { color: var(--mute); margin: 0; max-width: 46ch; }
+/* Mô tả chế độ luôn chiếm 3 dòng, link phím và dòng kỷ lục giữ chỗ dù ẩn */
+#screen-start .sub { min-height: calc(3 * 1.5em); display: flex; align-items: center; }
+.ghost { visibility: hidden; }
+#screen-start .best { min-height: 1.5em; }
 .fine { color: var(--mute); font-size: 12px; margin: 8px 0 0; max-width: 52ch; }
 .best { margin: 0; font-family: var(--mono); font-size: 13px; color: var(--mute); }
-.best:empty { display: none; }
+.best:empty:not(#best-line) { display: none; }
 
 .card {
   display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
