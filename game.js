@@ -16,6 +16,7 @@ const ANCHOR_HOLD_MS = 1000;  // nắm trụ giữ yên bao lâu thì đặt đi
 const ANCHOR_STILL = 0.35;    // khi đặt neo, tay không được lệch quá 35% cỡ tay
 const ROD_HALF_LEN = 1.8;     // nửa chiều dài trụ (theo cỡ tay)
 const ROD_TOL_X = 0.9;        // tay được lệch ngang khỏi trục trụ bao nhiêu (theo cỡ tay)
+// Trục trụ = đường nối khớp ngón trỏ → khớp ngón út lúc đặt neo (khi nắm trụ, các khớp xếp dọc theo trụ)
 const INVALID_GRACE_MS = 150; // tay sai tư thế / lệch trụ quá lâu thì nhát đang dở bị huỷ
 const GRIP_MAX_AVG = 1.45;    // trung bình độ duỗi 4 ngón dưới mức này = đang nắm (để đặt neo)
 const OPEN_MIN_CURL = 1.6;    // ngón duỗi hơn mức này = duỗi thẳng; cả 4 ngón duỗi = xòe tay
@@ -37,7 +38,7 @@ const STRINGS = {
     fine: "Game meme giải trí, 16+. Không có hình ảnh nhạy cảm. Video không rời khỏi máy bạn.",
     bestLine: (n, d) => `Kỷ lục ${d}s: ${n} nhát · ${(n / d).toFixed(2)} nhát/s`,
     step1: "<b>Xòe tay</b>, giữ 1 giây = sẵn sàng",
-    step2: "<b>Nắm tay như cầm trụ</b>, giữ yên 1 giây = đặt điểm neo",
+    step2: "<b>Nắm tay như cầm trụ</b>, giữ yên 1 giây = đặt điểm neo. Trụ nghiêng theo hướng tay bạn",
     step3: "Xóc <b>lên xuống dọc trụ</b>. Lệch trụ hoặc xòe tay thì không tính",
     go: "Sẵn sàng",
     opening: "Đang mở camera…",
@@ -87,7 +88,7 @@ const STRINGS = {
     fine: "Meme game for fun, 16+. No explicit imagery. Video never leaves your device.",
     bestLine: (n, d) => `Best ${d}s: ${n} strokes · ${(n / d).toFixed(2)}/s`,
     step1: "<b>Open palm</b>, hold 1s = ready",
-    step2: "<b>Grip like holding a rod</b>, hold still 1s = set anchor",
+    step2: "<b>Grip like holding a rod</b>, hold still 1s = set anchor. The rod tilts to match your hand",
     step3: "Stroke <b>up and down along the rod</b>. Drifting off or opening your hand doesn't count",
     go: "Ready",
     opening: "Opening camera…",
@@ -199,7 +200,8 @@ let count = 0;
 let playStart = 0;
 let bins = [];                // số nhát theo từng giây
 let displayRate = 0;
-let anchor = null;            // { x, y, size } — điểm neo của thanh trụ
+let anchor = null;            // { x, y, size, ux, uy } — điểm neo + vector đơn vị trục trụ
+let axisEma = null;           // trục tay làm mượt trong lúc giữ yên đặt neo
 let onRod = false;            // khung hiện tại: tay đang nắm đúng trên trụ
 let invalidSince = null;
 let framesOnRod = 0;
@@ -378,9 +380,15 @@ function analyzeHand(lm, aspect) {
   curlEma = curlEma ? curlEma.map((c, i) => c * 0.5 + raw[i] * 0.5) : raw;
   const curls = curlEma;
   const extended = curls.filter((c) => c > OPEN_MIN_CURL).length;
+  // Trục nắm tay (2D): khớp ngón trỏ → khớp ngón út, chuẩn hoá để hướng "xuống" (y ≥ 0)
+  let ux = (lm[17].x - lm[5].x) * aspect, uy = lm[17].y - lm[5].y;
+  const len = Math.hypot(ux, uy) || 1;
+  ux /= len; uy /= len;
+  if (uy < 0 || (uy === 0 && ux < 0)) { ux = -ux; uy = -uy; }
   return {
     lm,
     size,
+    ux, uy,
     x: PALM_IDS.reduce((s, i) => s + lm[i].x, 0) / PALM_IDS.length,
     y: PALM_IDS.reduce((s, i) => s + lm[i].y, 0) / PALM_IDS.length,
     open: extended === 4,
@@ -390,14 +398,21 @@ function analyzeHand(lm, aspect) {
   };
 }
 
+// Toạ độ tay so với trụ: `along` dọc trục (dương = về phía ngón út), `perp` lệch ngang
+function rodCoords(h, aspect) {
+  const dx = (h.x - anchor.x) * aspect;
+  const dy = h.y - anchor.y;
+  return { along: dx * anchor.ux + dy * anchor.uy, perp: Math.abs(dx * anchor.uy - dy * anchor.ux) };
+}
+
 function isOnRod(h, aspect) {
   if (!anchor || h.released) return false;
-  const dx = Math.abs(h.x - anchor.x) * aspect;
-  const dy = Math.abs(h.y - anchor.y);
-  return dx < anchor.size * ROD_TOL_X && dy < anchor.size * ROD_HALF_LEN;
+  const { along, perp } = rodCoords(h, aspect);
+  return perp < anchor.size * ROD_TOL_X && Math.abs(along) < anchor.size * ROD_HALF_LEN;
 }
 
 // ---------- Xử lý mẫu ----------
+// `y` là toạ độ dọc trục đếm: trước khi có neo là y màn hình, có neo rồi là vị trí dọc trục trụ
 function feedSample(y, size, now) {
   smoothY = smoothY === null ? y : smoothY * 0.35 + y * 0.65;
   const rev = detector.push(smoothY, Math.max(0.015, size * STROKE_THR));
@@ -441,15 +456,26 @@ function processFrame(res, now) {
     // Nắm tay như cầm trụ và giữ yên → đặt điểm neo tại đó
     const inZone = !!hand && Math.abs(hand.x - 0.5) < ANCHOR_ZONE_X && Math.abs(hand.y - 0.5) < ANCHOR_ZONE_Y;
     const gripping = !!hand && hand.grip && inZone;
-    if (!gripping) anchorRef = null;
+    if (!gripping) { anchorRef = null; axisEma = null; }
     else if (!anchorRef || Math.hypot((hand.x - anchorRef.x) * aspect, hand.y - anchorRef.y) > hand.size * ANCHOR_STILL) {
       anchorRef = { x: hand.x, y: hand.y }; // tay dịch chuyển → đếm lại từ đầu
       anchorHold.reset();
+      axisEma = null;
+    }
+    if (gripping && seen) {
+      // Làm mượt trục tay trong lúc giữ yên; lật dấu nếu khung này ngược với trung bình
+      if (!axisEma) axisEma = { ux: seen.ux, uy: seen.uy };
+      else {
+        const s = seen.ux * axisEma.ux + seen.uy * axisEma.uy < 0 ? -1 : 1;
+        axisEma.ux = axisEma.ux * 0.8 + s * seen.ux * 0.2;
+        axisEma.uy = axisEma.uy * 0.8 + s * seen.uy * 0.2;
+      }
     }
     progress = anchorHold.update(gripping, now);
     setGesture(t(!hand || !hand.grip ? "gGrip" : !inZone ? "gCenter" : "gHold"), progress);
     if (progress >= 1) {
-      anchor = { x: hand.x, y: hand.y, size: hand.size };
+      const len = Math.hypot(axisEma.ux, axisEma.uy) || 1;
+      anchor = { x: hand.x, y: hand.y, size: hand.size, ux: axisEma.ux / len, uy: axisEma.uy / len };
       detector.reset();
       smoothY = null;
       startCountdown();
@@ -470,7 +496,10 @@ function processFrame(res, now) {
     if (state === "playing") { framesTotal++; if (onRod) framesOnRod++; }
   }
 
-  if (seen) feedSample(seen.y, anchor ? anchor.size : seen.size, now);
+  if (seen) {
+    if (anchor) feedSample(rodCoords(seen, aspect).along, anchor.size, now);
+    else feedSample(seen.y, seen.size, now);
+  }
   draw(seen, progress);
 }
 
@@ -480,18 +509,21 @@ function draw(seen, progress) {
   octx.clearRect(0, 0, w, h);
 
   if (anchor && (state === "countdown" || state === "playing")) {
-    const ax = anchor.x * w, ay = anchor.y * h;
     const half = anchor.size * ROD_HALF_LEN * h;
     const tol = anchor.size * ROD_TOL_X * h;
     // Trắng: đúng trụ · Đỏ: buông tay / lệch trụ · Xám: mất dấu tay
     const color = !hand ? "#8b8b8b" : onRod ? "#f2f2f2" : "#ff3b3b";
+    // Vẽ trong hệ toạ độ của trụ: gốc tại điểm neo, trục y cục bộ trùng trục trụ
+    octx.save();
+    octx.translate(anchor.x * w, anchor.y * h);
+    octx.rotate(Math.atan2(anchor.uy, anchor.ux) - Math.PI / 2);
     // Vùng hợp lệ: viền nét đứt mảnh
     octx.strokeStyle = color;
     octx.globalAlpha = 0.5;
     octx.setLineDash([4, 6]);
     octx.lineWidth = 1.5;
     octx.beginPath();
-    octx.roundRect(ax - tol, ay - half, tol * 2, half * 2, tol);
+    octx.roundRect(-tol, -half, tol * 2, half * 2, tol);
     octx.stroke();
     octx.setLineDash([]);
     // Thanh trụ: một khối đặc
@@ -499,12 +531,13 @@ function draw(seen, progress) {
     octx.globalAlpha = 0.85;
     octx.fillStyle = color;
     octx.beginPath();
-    octx.roundRect(ax - rodW / 2, ay - half, rodW, half * 2, rodW / 2);
+    octx.roundRect(-rodW / 2, -half, rodW, half * 2, rodW / 2);
     octx.fill();
-    // Điểm neo: vạch ngang cắt qua trụ
+    // Điểm neo: vạch cắt ngang trụ
     octx.globalAlpha = 1;
     octx.fillStyle = "#0b0b0b";
-    octx.fillRect(ax - rodW / 2, ay - 1.5, rodW, 3);
+    octx.fillRect(-rodW / 2, -1.5, rodW, 3);
+    octx.restore();
   }
 
   if (!seen) return;
@@ -695,7 +728,11 @@ function loop() {
   const marker = $("power-hand");
   const visible = smoothY !== null && handVisible();
   marker.classList.toggle("on", visible);
-  if (visible) marker.style.top = `calc(${(Math.min(1, Math.max(0, smoothY)) * 100).toFixed(1)}% - 1px)`;
+  if (visible) {
+    // Có neo: smoothY là vị trí dọc trụ (−half..half) → quy về 0..1 theo chiều dài trụ
+    const pos = anchor && input === "camera" ? 0.5 + smoothY / (2 * anchor.size * ROD_HALF_LEN) : smoothY;
+    marker.style.top = `calc(${(Math.min(1, Math.max(0, pos)) * 100).toFixed(1)}% - 1px)`;
+  }
 
   if (state === "playing") {
     const left = Math.max(0, duration - (now - playStart) / 1000);
@@ -728,13 +765,18 @@ if (params.has("debug")) {
   if (auto) {
     window.__amb.useFakeCamera();
     duration = 10;
-    anchor = { x: 0.5, y: 0.5, size: 0.14 };
+    // Trụ nghiêng 25° để thấy rõ trục theo tay
+    const tilt = (25 * Math.PI) / 180;
+    anchor = { x: 0.5, y: 0.5, size: 0.14, ux: Math.sin(tilt), uy: Math.cos(tilt) };
+    // Tay nắm giả: cổ tay bên trái, các khớp xếp dọc theo trục trụ
     const fakeHand = (cx, cy) => {
-      const lm = Array.from({ length: 21 }, () => ({ x: cx, y: cy, z: 0 }));
-      lm[0] = { x: cx, y: cy + 0.08, z: 0 };
-      [[5, -0.04, 8], [9, 0, 12], [13, 0.035, 16], [17, 0.065, 20]].forEach(([m, dx, tip]) => {
-        lm[m] = { x: cx + dx, y: cy - 0.06, z: 0 };
-        lm[tip] = { x: lm[0].x + 1.1 * dx, y: lm[0].y - 1.1 * 0.14, z: 0 };
+      const aspect = overlay.width / overlay.height;
+      const rot = (dx, dy) => ({ x: cx + (dx * Math.cos(tilt) - dy * Math.sin(tilt)) / aspect, y: cy + dx * Math.sin(tilt) + dy * Math.cos(tilt), z: 0 });
+      const lm = Array.from({ length: 21 }, () => rot(0, 0));
+      lm[0] = rot(-0.08, 0);
+      [[5, -0.05, 8], [9, -0.015, 12], [13, 0.02, 16], [17, 0.055, 20]].forEach(([m, dy, tip]) => {
+        lm[m] = rot(0.06, dy);
+        lm[tip] = rot(0.06 + 0.014, dy);
       });
       return lm;
     };
@@ -742,7 +784,7 @@ if (params.has("debug")) {
       startPlaying();
       count = 12; $("hud-count").textContent = count;
       for (let i = 0; i < 6; i++) strokes.push(performance.now() - i * 200);
-      processFrame({ landmarks: [fakeHand(0.5, 0.53)] }, performance.now());
+      processFrame({ landmarks: [fakeHand(0.5, 0.5)] }, performance.now());
     } else {
       count = 39; bins = [3, 4, 4, 5, 4, 4, 4, 4, 4, 3]; framesTotal = 100; framesOnRod = 82;
       finish();

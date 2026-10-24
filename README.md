@@ -28,7 +28,7 @@ Khi đưa lên mạng phải dùng HTTPS (GitHub Pages, Vercel, Netlify… đề
 
 1. Chọn thời gian (10 / 20 / 30 giây), bấm **Bật camera & chơi**. Đây là lần bấm chuột duy nhất; từ đây điều khiển hoàn toàn bằng tay.
 2. **Xòe bàn tay**, giữ 1 giây → sẵn sàng.
-3. **Nắm tay như cầm trụ**, giữ yên 1 giây → game đặt **điểm neo** và vẽ thanh trụ ảo tại đó.
+3. **Nắm tay như cầm trụ**, giữ yên 1 giây → game đặt **điểm neo** và vẽ thanh trụ ảo tại đó, nghiêng theo đúng hướng tay bạn đang nắm.
 4. Đếm ngược 3-2-1, rồi **xóc lên xuống dọc theo trụ**. Chỉ những nhát đúng tư thế (tay nắm, nằm trong vùng trụ) mới được tính.
 5. Hết giờ: xem tốc độ trung bình, tổng nhát, đỉnh, % thời gian bám trụ, biểu đồ từng giây. **Xòe tay 1 giây** để chơi lại, hoặc bấm **Lưu ảnh** để tải ảnh kết quả 1080×1080.
 
@@ -49,8 +49,9 @@ Mỗi khung hình, MediaPipe trả về 21 điểm khớp của bàn tay. Game t
 | Xòe tay | Cả 4 ngón duỗi |
 | Nắm trụ | Trung bình độ duỗi 4 ngón < 1.45 (ngón trỏ thường duỗi hơn khi cầm trụ nên không xét từng ngón) |
 | Buông trụ (khi chơi) | Từ 3 ngón duỗi thẳng trở lên |
-| Một nhát | Tay đi xuống rồi đảo chiều đi lên, biên độ tối thiểu 25% cỡ tay (hysteresis, chống rung) |
-| Bám trụ | Tay nắm, lệch ngang < 0.9 cỡ tay và lệch dọc < 1.8 cỡ tay so với điểm neo |
+| Trục trụ | Đường nối khớp ngón trỏ → khớp ngón út lúc đặt neo (làm mượt trong 1 giây giữ yên). Nắm trụ nghiêng thế nào thì trụ nghiêng thế ấy |
+| Một nhát | Vị trí tay chiếu lên trục trụ đi về một phía rồi đảo chiều, biên độ tối thiểu 25% cỡ tay (hysteresis, chống rung). Chuyển động vuông góc với trụ không được tính |
+| Bám trụ | Tay nắm, lệch khỏi trục < 0.9 cỡ tay và dọc trục < 1.8 cỡ tay so với điểm neo |
 
 Xóc nhanh làm tay bị nhòe và mô hình mất dấu vài khung. Trong 0.4 giây game giữ trạng thái gần nhất thay vì phạt; mất lâu hơn thì trụ chuyển xám và nhắc thêm ánh sáng.
 
@@ -102,6 +103,6 @@ Inspired by the "67 speed" trend. Hand tracking runs entirely in the browser wit
 
 **Run locally:** any static server works, e.g. `python3 -m http.server 5173`, then open http://localhost:5173. Camera access requires `localhost` or HTTPS.
 
-**Play:** pick a duration → open palm 1s to get ready → grip and hold still 1s to set the anchor → stroke along the virtual rod. Only strokes made while gripping inside the rod zone count. Open palm again to replay. Keyboard mode (`↑` `↓`) is available without a camera.
+**Play:** pick a duration → open palm 1s to get ready → grip and hold still 1s to set the anchor (the rod takes the tilt of your grip) → stroke along the virtual rod. Only strokes made while gripping inside the rod zone count. Open palm again to replay. Keyboard mode (`↑` `↓`) is available without a camera.
 
 Switch language with the VI / EN toggle. All tuning constants are documented at the top of `game.js`.
