@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ambatukam Game</title>
+  <meta name="description" content="Webcam meme game: how fast can you stroke? Runs entirely in your browser." />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="top">
+    <div class="logo">AMBATUKAM</div>
+    <div class="lang" id="lang">
+      <button data-lang="vi">VI</button>
+      <button data-lang="en">EN</button>
+    </div>
+  </header>
+
+  <main class="stage">
+    <section class="cam-wrap">
+      <video id="video" playsinline muted></video>
+      <canvas id="overlay"></canvas>
+
+      <!-- Thanh hướng dẫn cử chỉ (xòe tay / nắm trụ) -->
+      <div id="gesture" class="gesture hidden">
+        <div id="gesture-text"></div>
+        <div class="gbar"><div id="gesture-fill"></div></div>
+      </div>
+
+      <!-- Màn hình bắt đầu -->
+      <div id="screen-start" class="screen">
+        <h1 data-i18n="title"></h1>
+        <p class="sub" data-i18n="sub"></p>
+        <div class="seg" id="durations">
+          <button data-d="10">10s</button>
+          <button data-d="20" class="active">20s</button>
+          <button data-d="30">30s</button>
+        </div>
+        <button id="btn-start" class="btn primary" data-i18n="start"></button>
+        <button id="btn-keyboard" class="link" data-i18n="keyboard"></button>
+        <p class="best" id="best-line"></p>
+        <p class="fine" data-i18n="fine"></p>
+      </div>
+
+      <!-- Chuẩn bị: xòe tay → nắm trụ đặt neo -->
+      <div id="screen-ready" class="screen clear hidden">
+        <div class="card">
+          <p class="hint" id="ready-hint"></p>
+          <ol class="steps">
+            <li data-i18n="step1"></li>
+            <li data-i18n="step2"></li>
+            <li data-i18n="step3"></li>
+          </ol>
+          <button id="btn-go" class="btn primary hidden" data-i18n="go"></button>
+        </div>
+      </div>
+
+      <!-- Đếm ngược -->
+      <div id="screen-countdown" class="screen clear hidden"><div id="countdown" class="countdown">3</div></div>
+
+      <!-- HUD khi chơi -->
+      <div id="hud" class="hud hidden">
+        <div class="hud-timer"><span id="hud-time">20.0</span></div>
+        <div class="hud-status" id="hud-status"></div>
+        <div class="hud-count"><span id="hud-count">0</span><small data-i18n="strokes"></small></div>
+      </div>
+
+      <!-- Kết quả -->
+      <div id="screen-result" class="screen hidden">
+        <div class="res-hero">
+          <span class="res-num" id="res-avg">0.00</span>
+          <span class="res-unit" data-i18n="avg"></span>
+        </div>
+        <h2 id="res-title"></h2>
+        <p class="res-note" id="res-note"></p>
+        <dl class="res-stats">
+          <div><dt data-i18n="total"></dt><dd id="res-total">0</dd></div>
+          <div><dt data-i18n="peak"></dt><dd id="res-peak">0</dd></div>
+          <div id="res-grip-wrap"><dt data-i18n="gripLabel"></dt><dd id="res-grip">–</dd></div>
+        </dl>
+        <canvas id="res-chart" width="560" height="110"></canvas>
+        <p class="best" id="res-best"></p>
+        <div class="row">
+          <button id="btn-again" class="btn primary" data-i18n="again"></button>
+          <button id="btn-share" class="btn" data-i18n="share"></button>
+          <button id="btn-home" class="link" data-i18n="home"></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Thanh lực -->
+    <aside class="power">
+      <div class="power-label" data-i18n="power"></div>
+      <div class="power-bar" id="power-bar">
+        <div class="power-fill" id="power-fill"></div>
+        <div class="power-hand" id="power-hand"></div>
+      </div>
+      <div class="power-value"><span id="power-value">0.0</span><small data-i18n="perSec"></small></div>
+    </aside>
+  </main>
+
+  <footer class="foot" data-i18n="footer"></footer>
+
+  <script type="module" src="game.js"></script>
+</body>
+</html>
