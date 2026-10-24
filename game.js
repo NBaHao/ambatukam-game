@@ -70,7 +70,6 @@ const STRINGS = {
     chartLabel: "nhát mỗi giây",
     shareText: (r) => `Tôi đạt ${r} nhát/s trong Ambatukam Game`,
     shareSub: (n, d, p) => `${n} nhát trong ${d}s · đỉnh ${p}/s`,
-    footer: "Lấy cảm hứng từ trend “67 speed”. Nhận diện tay bằng MediaPipe, chạy local trong trình duyệt.",
     tiers: [
       ["Rùa bò", "Còn chưa khởi động xong."],
       ["Khởi động", "Tay bắt đầu nóng rồi."],
@@ -120,7 +119,6 @@ const STRINGS = {
     chartLabel: "strokes per second",
     shareText: (r) => `I hit ${r} strokes/s in Ambatukam Game`,
     shareSub: (n, d, p) => `${n} strokes in ${d}s · peak ${p}/s`,
-    footer: "Inspired by the “67 speed” trend. Hand tracking by MediaPipe, running locally in your browser.",
     tiers: [
       ["Turtle", "Still warming up."],
       ["Warm-up", "Your hand is getting there."],
