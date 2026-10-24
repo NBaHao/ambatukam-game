@@ -1,6 +1,11 @@
-// Ambatukam Game — MVP
-// Đếm số nhát xóc lên-xuống quanh một "thanh trụ ảo" tại điểm neo, trong thời gian cố định.
-// Nhận diện tay bằng MediaPipe Hand Landmarker, chạy hoàn toàn trong trình duyệt.
+// Ambatukam Game
+// Đếm số nhát xóc dọc theo một "thanh trụ ảo" đặt tại điểm neo. Nhận diện tay bằng
+// MediaPipe Hand Landmarker, chạy hoàn toàn trong trình duyệt.
+//
+// Chế độ:
+//   single  — 1 tay, 1 trụ, thời gian cố định, tính nhát/giây trung bình
+//   double  — 2 tay, 2 trụ, thời gian cố định
+//   random  — trụ xuất hiện ngẫu nhiên, phải đuổi theo; thanh Lửa cạn dần, hết Lửa là thua
 import { FilesetResolver, HandLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs";
 
 const WASM_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
@@ -21,9 +26,22 @@ const INVALID_GRACE_MS = 150; // tay sai tư thế / lệch trụ quá lâu thì
 const GRIP_MAX_AVG = 1.45;    // trung bình độ duỗi 4 ngón dưới mức này = đang nắm (để đặt neo)
 const OPEN_MIN_CURL = 1.6;    // ngón duỗi hơn mức này = duỗi thẳng; cả 4 ngón duỗi = xòe tay
 const RELEASE_FINGERS = 3;    // đang chơi: từ 3 ngón duỗi thẳng trở lên mới coi là buông trụ
-const ANCHOR_ZONE_X = 0.25;   // điểm neo phải cách tâm khung hình (ngang) không quá 25%
+const ANCHOR_ZONE_X = 0.25;   // single: điểm neo phải cách tâm khung hình (ngang) không quá 25%
 const ANCHOR_ZONE_Y = 0.3;
-const TIER_MIN = [0, 1, 2, 3, 4, 5]; // ngưỡng nhát/giây của từng danh hiệu
+const DOUBLE_ZONE_X = 0.42;   // double: mỗi tay cách tâm (ngang) không quá 42%
+const HAND_MIN_GAP = 2.2;     // double: hai điểm neo cách nhau ít nhất 2.2 cỡ tay
+const TIER_MIN = [0, 1, 2, 3, 4, 5]; // ngưỡng nhát/giây (mỗi tay) của từng danh hiệu
+// Random
+const RND_METER_START = 100;  // Lửa ban đầu (%)
+const RND_DRAIN_BASE = 10;    // Lửa cạn %/giây lúc đầu
+const RND_DRAIN_RAMP = 0.4;   // mỗi giây trôi qua, tốc độ cạn tăng thêm %/giây
+const RND_STROKE_GAIN = 5;    // mỗi nhát đúng trụ nạp thêm %
+const RND_ROD_LIFE_MAX = 5000;// trụ tồn tại bao lâu rồi nhảy chỗ khác (ms), giảm dần theo thời gian
+const RND_ROD_LIFE_MIN = 2500;
+const RND_ROD_LIFE_STEP = 100;// ms giảm mỗi giây chơi
+const RND_TILT_MAX = 45;      // độ nghiêng tối đa của trụ ngẫu nhiên (độ)
+const RND_MIN_JUMP = 0.25;    // trụ mới cách trụ cũ ít nhất (theo chiều cao khung)
+const RND_TIER_SEC = [0, 10, 20, 30, 45, 60]; // ngưỡng giây sống sót của từng danh hiệu
 
 const PALM_IDS = [0, 5, 9, 13, 17];
 const FINGERS = [[8, 5], [12, 9], [16, 13], [20, 17]]; // [đầu ngón, gốc ngón]
@@ -32,14 +50,23 @@ const FINGERS = [[8, 5], [12, 9], [16, 13], [20, 17]]; // [đầu ngón, gốc n
 const STRINGS = {
   vi: {
     title: "Ambatukam Challenge",
-    sub: "Nắm tay như cầm một thanh trụ, xóc lên xuống thật nhanh trước camera. Hết giờ, máy tính tốc độ trung bình của bạn.",
+    modeSingle: "Single", modeSingleDesc: "1 tay · 1 trụ · đo tốc độ",
+    modeDouble: "Double", modeDoubleDesc: "2 tay · 2 trụ · gấp đôi",
+    modeRandom: "Random", modeRandomDesc: "Trụ nhảy lung tung · sống sót",
+    modeRank: "Rank", modePvp: "PvP", soon: "Sắp có",
+    subSingle: "Nắm tay như cầm một thanh trụ, xóc lên xuống thật nhanh trước camera. Hết giờ, máy tính tốc độ trung bình của bạn.",
+    subDouble: "Hai tay, hai trụ. Cả hai cùng xóc, cộng dồn số nhát. Hết giờ, tính tốc độ trung bình.",
+    subRandom: "Trụ xuất hiện ngẫu nhiên và liên tục đổi chỗ. Đuổi theo mà xóc để giữ Lửa. Lửa cạn là thua, sống càng lâu càng tốt.",
     start: "Bật camera & chơi",
     keyboard: "Không có camera? Chơi bằng phím ↑ ↓",
     fine: "Game meme giải trí, 16+. Không có hình ảnh nhạy cảm. Video không rời khỏi máy bạn.",
     bestLine: (n, d) => `Kỷ lục ${d}s: ${n} nhát · ${(n / d).toFixed(2)} nhát/s`,
-    step1: "<b>Xòe tay</b>, giữ 1 giây = sẵn sàng",
-    step2: "<b>Nắm tay như cầm trụ</b>, giữ yên 1 giây = đặt điểm neo. Trụ nghiêng theo hướng tay bạn",
-    step3: "Xóc <b>lên xuống dọc trụ</b>. Lệch trụ hoặc xòe tay thì không tính",
+    bestLineRandom: (s) => `Kỷ lục: sống sót ${s.toFixed(1)}s`,
+    steps: {
+      single: ["<b>Xòe tay</b>, giữ 1 giây = sẵn sàng", "<b>Nắm tay như cầm trụ</b>, giữ yên 1 giây = đặt điểm neo. Trụ nghiêng theo hướng tay bạn", "Xóc <b>lên xuống dọc trụ</b>. Lệch trụ hoặc xòe tay thì không tính"],
+      double: ["<b>Xòe một tay</b>, giữ 1 giây = sẵn sàng", "<b>Nắm cả hai tay</b> như cầm hai trụ, giữ yên 1 giây = đặt hai điểm neo", "Xóc cả hai tay dọc trụ của mỗi tay. Nhát của hai tay cộng dồn"],
+      random: ["<b>Xòe tay</b>, giữ 1 giây = sẵn sàng", "Trụ hiện ở chỗ ngẫu nhiên. <b>Nắm tay tới đó</b> và xóc dọc trụ", "Mỗi nhát nạp <b>Lửa</b>, Lửa cạn dần ngày càng nhanh. Trụ đổi chỗ liên tục. Hết Lửa là dừng"],
+    },
     go: "Sẵn sàng",
     opening: "Đang mở camera…",
     loading: "Đang tải mô hình nhận diện tay…",
@@ -48,28 +75,40 @@ const STRINGS = {
     gPalmReady: "✋ Xòe tay, giữ 1 giây để <b>sẵn sàng</b>",
     gPalmReplay: "✋ Xòe tay, giữ 1 giây để <b>chơi lại</b>",
     gGrip: "✊ Nắm tay như đang <b>cầm một thanh trụ</b>",
+    gGripBoth: "✊✊ Nắm <b>cả hai tay</b> như cầm hai trụ",
+    gTwoHands: "Đưa <b>cả hai tay</b> vào khung hình",
     gCenter: "Đưa tay vào <b>gần giữa khung hình</b>",
+    gApart: "Hai tay <b>cách xa nhau</b> hơn",
     gHold: "Giữ yên để đặt <b>điểm neo</b>",
     gCountdown: "Giữ tay trên trụ, chuẩn bị…",
+    gCountdownRandom: "Nắm tay tới chỗ trụ, chuẩn bị…",
     strokes: "nhát",
     power: "Lực",
+    heat: "Lửa",
     perSec: "nhát/s",
     sLost: "Mất dấu tay. Thêm ánh sáng sẽ đỡ nhòe",
     sGrip: "Nắm tay lại",
     sAnchor: "Quay lại điểm neo",
+    sGoRod: "Tới trụ mới!",
+    sOneHand: "Thiếu một tay",
     avg: "nhát / giây trung bình",
+    survived: "giây sống sót",
     total: "tổng nhát",
     peak: "đỉnh / giây",
     gripLabel: "bám trụ",
+    rods: "trụ đã bắt",
     newBest: (prev) => `Kỷ lục mới · cũ ${prev}`,
     firstBest: "Kỷ lục đầu tiên",
     bestShort: (n, d) => `Kỷ lục ${d}s: ${n} nhát`,
+    bestShortRandom: (s) => `Kỷ lục: ${s}s`,
     again: "Chơi lại",
     share: "Lưu ảnh",
-    home: "Đổi thời gian",
+    home: "Đổi chế độ",
     chartLabel: "nhát mỗi giây",
     shareText: (r) => `Tôi đạt ${r} nhát/s trong Ambatukam Game`,
+    shareTextRandom: (s) => `Tôi sống sót ${s}s trong Ambatukam Random`,
     shareSub: (n, d, p) => `${n} nhát trong ${d}s · đỉnh ${p}/s`,
+    shareSubRandom: (n, r) => `${n} nhát · ${r} trụ`,
     tiers: [
       ["Rùa bò", "Còn chưa khởi động xong."],
       ["Khởi động", "Tay bắt đầu nóng rồi."],
@@ -81,14 +120,23 @@ const STRINGS = {
   },
   en: {
     title: "Ambatukam Challenge",
-    sub: "Grip like you're holding a rod, then stroke up and down as fast as you can. When time's up, we score your average speed.",
+    modeSingle: "Single", modeSingleDesc: "1 hand · 1 rod · speed test",
+    modeDouble: "Double", modeDoubleDesc: "2 hands · 2 rods · twice the work",
+    modeRandom: "Random", modeRandomDesc: "Rod keeps moving · survive",
+    modeRank: "Rank", modePvp: "PvP", soon: "Coming soon",
+    subSingle: "Grip like you're holding a rod, then stroke up and down as fast as you can. When time's up, we score your average speed.",
+    subDouble: "Two hands, two rods. Stroke both at once; strokes add up. When time's up, we score your average speed.",
+    subRandom: "The rod spawns at random and keeps relocating. Chase it and stroke to keep your Heat up. Heat hits zero, game over. Survive as long as you can.",
     start: "Turn on camera & play",
     keyboard: "No camera? Play with ↑ ↓ keys",
     fine: "Meme game for fun, 16+. No explicit imagery. Video never leaves your device.",
     bestLine: (n, d) => `Best ${d}s: ${n} strokes · ${(n / d).toFixed(2)}/s`,
-    step1: "<b>Open palm</b>, hold 1s = ready",
-    step2: "<b>Grip like holding a rod</b>, hold still 1s = set anchor. The rod tilts to match your hand",
-    step3: "Stroke <b>up and down along the rod</b>. Drifting off or opening your hand doesn't count",
+    bestLineRandom: (s) => `Best: survived ${s.toFixed(1)}s`,
+    steps: {
+      single: ["<b>Open palm</b>, hold 1s = ready", "<b>Grip like holding a rod</b>, hold still 1s = set anchor. The rod tilts to match your hand", "Stroke <b>up and down along the rod</b>. Drifting off or opening your hand doesn't count"],
+      double: ["<b>Open one palm</b>, hold 1s = ready", "<b>Grip with both hands</b> like holding two rods, hold still 1s = set both anchors", "Stroke both hands along their rods. Strokes from both hands add up"],
+      random: ["<b>Open palm</b>, hold 1s = ready", "A rod spawns somewhere random. <b>Grip and move to it</b>, then stroke along it", "Each stroke adds <b>Heat</b>; Heat drains faster over time. The rod keeps relocating. Zero Heat ends the run"],
+    },
     go: "Ready",
     opening: "Opening camera…",
     loading: "Loading hand-tracking model…",
@@ -97,28 +145,40 @@ const STRINGS = {
     gPalmReady: "✋ Open palm, hold 1s to get <b>ready</b>",
     gPalmReplay: "✋ Open palm, hold 1s to <b>play again</b>",
     gGrip: "✊ Grip like you're <b>holding a rod</b>",
+    gGripBoth: "✊✊ Grip with <b>both hands</b> like holding two rods",
+    gTwoHands: "Bring <b>both hands</b> into frame",
     gCenter: "Move your hand <b>closer to the center</b>",
+    gApart: "Move your hands <b>further apart</b>",
     gHold: "Hold still to set the <b>anchor</b>",
     gCountdown: "Keep your hand on the rod, get set…",
+    gCountdownRandom: "Grip and move to the rod, get set…",
     strokes: "strokes",
     power: "Power",
+    heat: "Heat",
     perSec: "per sec",
     sLost: "Lost your hand. More light reduces blur",
     sGrip: "Grip again",
     sAnchor: "Back to the anchor",
+    sGoRod: "Go to the new rod!",
+    sOneHand: "One hand missing",
     avg: "strokes / sec average",
+    survived: "seconds survived",
     total: "total strokes",
     peak: "peak / sec",
     gripLabel: "on rod",
+    rods: "rods caught",
     newBest: (prev) => `New best · was ${prev}`,
     firstBest: "First record",
     bestShort: (n, d) => `Best ${d}s: ${n} strokes`,
+    bestShortRandom: (s) => `Best: ${s}s`,
     again: "Play again",
     share: "Save image",
-    home: "Change time",
+    home: "Change mode",
     chartLabel: "strokes per second",
     shareText: (r) => `I hit ${r} strokes/s in Ambatukam Game`,
+    shareTextRandom: (s) => `I survived ${s}s in Ambatukam Random`,
     shareSub: (n, d, p) => `${n} strokes in ${d}s · peak ${p}/s`,
+    shareSubRandom: (n, r) => `${n} strokes · ${r} rods`,
     tiers: [
       ["Turtle", "Still warming up."],
       ["Warm-up", "Your hand is getting there."],
@@ -170,6 +230,95 @@ class Hold {
   }
 }
 
+// ---------- Một bàn tay đang được theo dõi ----------
+// Mỗi track có bộ đếm, neo, và bộ làm mượt riêng. Single/Random dùng 1 track, Double dùng 2.
+class HandTrack {
+  constructor() { this.detector = new StrokeDetector(); this.count = 0; this.reset(); }
+  reset() {
+    this.hand = null;        // kết quả analyze của khung gần nhất (giữ lại trong LOST_HAND_MS)
+    this.lastAt = 0;
+    this.smooth = null;      // toạ độ dọc trục đếm đã làm mượt
+    this.curlEma = null;
+    this.anchor = null;      // { x, y, size, ux, uy }
+    this.onRod = false;
+    this.invalidSince = null;
+    this.anchorRef = null;   // vị trí lúc bắt đầu giữ yên
+    this.axisEma = null;
+    this.detector.reset();
+  }
+  clearMotion() { this.detector.reset(); this.smooth = null; }
+  visible(now) { return now - this.lastAt < LOST_HAND_MS; }
+
+  // Mọi khoảng cách quy về đơn vị chiều cao khung hình. z của MediaPipe cùng thang với x.
+  analyze(lm, aspect) {
+    const P = (i) => [lm[i].x * aspect, lm[i].y, lm[i].z * aspect];
+    const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+    const wrist = P(0);
+    const size = dist(wrist, P(9));
+    // Độ duỗi mỗi ngón = (cổ tay→đầu ngón) / (cổ tay→gốc ngón): ~1.9 khi duỗi, ~1 khi co
+    // Làm mượt qua các khung để vài khung nhòe không làm đổi trạng thái nắm/xòe
+    const raw = FINGERS.map(([tip, mcp]) => dist(P(tip), wrist) / dist(P(mcp), wrist));
+    this.curlEma = this.curlEma ? this.curlEma.map((c, i) => c * 0.5 + raw[i] * 0.5) : raw;
+    const curls = this.curlEma;
+    const extended = curls.filter((c) => c > OPEN_MIN_CURL).length;
+    // Trục nắm tay (2D): khớp ngón trỏ → khớp ngón út, chuẩn hoá để hướng "xuống" (y ≥ 0)
+    let ux = (lm[17].x - lm[5].x) * aspect, uy = lm[17].y - lm[5].y;
+    const len = Math.hypot(ux, uy) || 1;
+    ux /= len; uy /= len;
+    if (uy < 0 || (uy === 0 && ux < 0)) { ux = -ux; uy = -uy; }
+    return {
+      lm, size, ux, uy,
+      x: PALM_IDS.reduce((s, i) => s + lm[i].x, 0) / PALM_IDS.length,
+      y: PALM_IDS.reduce((s, i) => s + lm[i].y, 0) / PALM_IDS.length,
+      open: extended === 4,
+      // Khi cầm trụ, ngón trỏ thường duỗi hơn các ngón khác nên xét trung bình thay vì từng ngón
+      grip: curls.reduce((a, b) => a + b, 0) / curls.length < GRIP_MAX_AVG,
+      released: extended >= RELEASE_FINGERS,
+    };
+  }
+
+  // Toạ độ tay so với trụ: `along` dọc trục (dương = về phía ngón út), `perp` lệch ngang
+  rodCoords(h, aspect) {
+    const dx = (h.x - this.anchor.x) * aspect;
+    const dy = h.y - this.anchor.y;
+    return { along: dx * this.anchor.ux + dy * this.anchor.uy, perp: Math.abs(dx * this.anchor.uy - dy * this.anchor.ux) };
+  }
+  isOnRod(h, aspect) {
+    if (!this.anchor || h.released) return false;
+    const { along, perp } = this.rodCoords(h, aspect);
+    return perp < this.anchor.size * ROD_TOL_X && Math.abs(along) < this.anchor.size * ROD_HALF_LEN;
+  }
+
+  // Cập nhật trục tay làm mượt trong lúc giữ yên; lật dấu nếu khung này ngược với trung bình
+  accumulateAxis(h) {
+    if (!this.axisEma) { this.axisEma = { ux: h.ux, uy: h.uy }; return; }
+    const s = h.ux * this.axisEma.ux + h.uy * this.axisEma.uy < 0 ? -1 : 1;
+    this.axisEma.ux = this.axisEma.ux * 0.8 + s * h.ux * 0.2;
+    this.axisEma.uy = this.axisEma.uy * 0.8 + s * h.uy * 0.2;
+  }
+  // Tay có đang giữ yên không (so với lúc bắt đầu giữ). Trả về false nếu vừa dịch chuyển.
+  updateStill(h, aspect) {
+    if (!this.anchorRef || Math.hypot((h.x - this.anchorRef.x) * aspect, h.y - this.anchorRef.y) > h.size * ANCHOR_STILL) {
+      this.anchorRef = { x: h.x, y: h.y };
+      this.axisEma = null;
+      return false;
+    }
+    return true;
+  }
+  commitAnchor(h) {
+    const a = this.axisEma || { ux: h.ux, uy: h.uy };
+    const len = Math.hypot(a.ux, a.uy) || 1;
+    this.anchor = { x: h.x, y: h.y, size: h.size, ux: a.ux / len, uy: a.uy / len };
+    this.clearMotion();
+  }
+
+  // Đưa một mẫu toạ độ vào bộ đếm. Trả về "bottom" (một nhát), "top" hoặc null.
+  feed(v, size) {
+    this.smooth = this.smooth === null ? v : this.smooth * 0.35 + v * 0.65;
+    return this.detector.push(this.smooth, Math.max(0.015, size * STROKE_THR));
+  }
+}
+
 // ---------- DOM ----------
 const $ = (id) => document.getElementById(id);
 const video = $("video");
@@ -185,31 +334,32 @@ const screens = {
 const hud = $("hud");
 
 // ---------- State ----------
+let mode = localStorage.getItem("ambatukam_mode") || "single"; // single | double | random
 let duration = 20;
 let state = "start";          // start | ready | anchor | countdown | playing | result
 let input = null;             // "camera" | "keyboard"
 let landmarker = null;
 let lastVideoTime = -1;
-let lastHandAt = 0;
-let hand = null;              // kết quả analyzeHand của khung gần nhất
-let smoothY = null;
+let tracks = [new HandTrack()];
 let strokes = [];             // timestamp mọi nhát (để tính tốc độ tức thời)
 let count = 0;
 let playStart = 0;
 let bins = [];                // số nhát theo từng giây
 let displayRate = 0;
-let anchor = null;            // { x, y, size, ux, uy } — điểm neo + vector đơn vị trục trụ
-let axisEma = null;           // trục tay làm mượt trong lúc giữ yên đặt neo
-let onRod = false;            // khung hiện tại: tay đang nắm đúng trên trụ
-let invalidSince = null;
 let framesOnRod = 0;
 let framesTotal = 0;
-let anchorRef = null;         // vị trí tay lúc bắt đầu giữ yên để đặt neo
-let curlEma = null;           // độ duỗi ngón đã làm mượt qua các khung hình
 let lastResult = null;        // để vẽ lại màn kết quả khi đổi ngôn ngữ
-const detector = new StrokeDetector();
+// Random
+let meter = 0;                // Lửa (%)
+let rodSpawnAt = 0;
+let rodsCaught = 0;
+let rodHasStroke = false;
+let refSize = 0.12;           // cỡ tay đo lúc xòe tay, dùng để vẽ trụ ngẫu nhiên
+let lastTick = 0;
 const palmHold = new Hold(PALM_HOLD_MS);
 const anchorHold = new Hold(ANCHOR_HOLD_MS);
+
+const isTimed = () => mode !== "random";
 
 // ---------- Âm thanh ----------
 let audio = null;
@@ -234,14 +384,24 @@ function say(text) {
   speechSynthesis.speak(u);
 }
 
-// ---------- Ngôn ngữ: áp dụng lên DOM ----------
+// ---------- Ngôn ngữ + chế độ: áp dụng lên DOM ----------
 function applyLang() {
   document.documentElement.lang = lang;
   for (const el of document.querySelectorAll("[data-i18n]")) el.innerHTML = t(el.dataset.i18n);
   for (const b of $("lang").children) b.classList.toggle("active", b.dataset.lang === lang);
-  renderBestLine();
+  renderModeTexts();
   if (input === "keyboard" && state === "ready") $("ready-hint").innerHTML = t("kbHint");
   if (state === "result" && lastResult) renderResult();
+}
+
+function renderModeTexts() {
+  for (const b of $("modes").children) b.classList.toggle("active", b.dataset.mode === mode);
+  $("sub").textContent = t("sub" + mode[0].toUpperCase() + mode.slice(1));
+  $("steps").innerHTML = t("steps")[mode].map((s) => `<li>${s}</li>`).join("");
+  $("durations").classList.toggle("hidden", !isTimed());
+  $("btn-keyboard").classList.toggle("hidden", mode !== "single");
+  $("power-label").textContent = t(mode === "random" ? "heat" : "power");
+  renderBestLine();
 }
 
 $("lang").addEventListener("click", (e) => {
@@ -250,6 +410,14 @@ $("lang").addEventListener("click", (e) => {
   lang = b.dataset.lang;
   localStorage.setItem("ambatukam_lang", lang);
   applyLang();
+});
+
+$("modes").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-mode]");
+  if (!b) return;
+  mode = b.dataset.mode;
+  localStorage.setItem("ambatukam_mode", mode);
+  renderModeTexts();
 });
 
 // ---------- Điều hướng màn hình ----------
@@ -270,11 +438,11 @@ function setGesture(text, progress = 0) {
   $("gesture-fill").style.width = (progress * 100).toFixed(0) + "%";
 }
 
-function bestKey() { return `ambatukam_best_${duration}`; }
+function bestKey() { return isTimed() ? `ambatukam_best_${mode}_${duration}` : "ambatukam_best_random"; }
 function getBest() { return Number(localStorage.getItem(bestKey()) || 0); }
 function renderBestLine() {
   const b = getBest();
-  $("best-line").textContent = b ? t("bestLine", b, duration) : "";
+  $("best-line").textContent = !b ? "" : isTimed() ? t("bestLine", b, duration) : t("bestLineRandom", b);
 }
 
 $("durations").addEventListener("click", (e) => {
@@ -290,9 +458,14 @@ function initAudio() {
   audio.resume();
 }
 
+function setupTracks() {
+  tracks = mode === "double" ? [new HandTrack(), new HandTrack()] : [new HandTrack()];
+}
+
 $("btn-start").addEventListener("click", async () => {
   initAudio();
   input = "camera";
+  setupTracks();
   show("ready");
   $("btn-go").classList.add("hidden");
   try {
@@ -310,7 +483,7 @@ $("btn-start").addEventListener("click", async () => {
 $("btn-keyboard").addEventListener("click", () => {
   initAudio();
   input = "keyboard";
-  anchor = null;
+  setupTracks();
   show("ready");
   $("ready-hint").innerHTML = t("kbHint");
   $("btn-go").classList.remove("hidden");
@@ -326,11 +499,12 @@ function replay() {
   else startCountdown();
 }
 
+// Sau khi "sẵn sàng": single/double sang bước đặt neo; random sinh trụ luôn và đếm ngược
 function enterAnchor() {
-  anchor = null;
-  anchorRef = null;
-  show("anchor");
+  for (const tr of tracks) { tr.anchor = null; tr.anchorRef = null; tr.axisEma = null; }
   beep(660, 80, 0.08, "sine");
+  if (mode === "random") { spawnRod(); startCountdown(); }
+  else show("anchor");
 }
 
 // ---------- Camera + mô hình ----------
@@ -351,7 +525,7 @@ async function createLandmarker() {
   const opts = (delegate) => ({
     baseOptions: { modelAssetPath: MODEL_URL, delegate },
     runningMode: "VIDEO",
-    numHands: 1,
+    numHands: 2,
     minHandDetectionConfidence: 0.5,
     minHandPresenceConfidence: 0.4,
     minTrackingConfidence: 0.3,
@@ -363,69 +537,78 @@ async function createLandmarker() {
   }
 }
 
-function handVisible() { return performance.now() - lastHandAt < LOST_HAND_MS; }
+// ---------- Gán bàn tay nhận diện được vào từng track ----------
+const palmCenter = (lm) => ({
+  x: PALM_IDS.reduce((s, i) => s + lm[i].x, 0) / PALM_IDS.length,
+  y: PALM_IDS.reduce((s, i) => s + lm[i].y, 0) / PALM_IDS.length,
+});
 
-// ---------- Phân tích tư thế tay ----------
-// Mọi khoảng cách quy về đơn vị chiều cao khung hình. z của MediaPipe cùng thang với x.
-function analyzeHand(lm, aspect) {
-  const P = (i) => [lm[i].x * aspect, lm[i].y, lm[i].z * aspect];
-  const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
-  const wrist = P(0);
-  const size = dist(wrist, P(9));
-  // Độ duỗi mỗi ngón = (cổ tay→đầu ngón) / (cổ tay→gốc ngón): ~1.9 khi duỗi, ~1 khi co
-  // Làm mượt qua các khung để vài khung nhòe không làm đổi trạng thái nắm/xòe
-  const raw = FINGERS.map(([tip, mcp]) => dist(P(tip), wrist) / dist(P(mcp), wrist));
-  curlEma = curlEma ? curlEma.map((c, i) => c * 0.5 + raw[i] * 0.5) : raw;
-  const curls = curlEma;
-  const extended = curls.filter((c) => c > OPEN_MIN_CURL).length;
-  // Trục nắm tay (2D): khớp ngón trỏ → khớp ngón út, chuẩn hoá để hướng "xuống" (y ≥ 0)
-  let ux = (lm[17].x - lm[5].x) * aspect, uy = lm[17].y - lm[5].y;
-  const len = Math.hypot(ux, uy) || 1;
-  ux /= len; uy /= len;
-  if (uy < 0 || (uy === 0 && ux < 0)) { ux = -ux; uy = -uy; }
-  return {
-    lm,
-    size,
-    ux, uy,
-    x: PALM_IDS.reduce((s, i) => s + lm[i].x, 0) / PALM_IDS.length,
-    y: PALM_IDS.reduce((s, i) => s + lm[i].y, 0) / PALM_IDS.length,
-    open: extended === 4,
-    // Khi cầm trụ, ngón trỏ thường duỗi hơn các ngón khác nên xét trung bình thay vì từng ngón
-    grip: curls.reduce((a, b) => a + b, 0) / curls.length < GRIP_MAX_AVG,
-    released: extended >= RELEASE_FINGERS,
-  };
+function assignHands(list, aspect) {
+  if (!list.length) return tracks.map(() => null);
+  const centers = list.map(palmCenter);
+  const d = (c, p) => Math.hypot((c.x - p.x) * aspect, c.y - p.y);
+  if (tracks.length === 1) {
+    // Một track: lấy bàn tay gần vị trí gần nhất (hoặc gần trụ nếu đang chơi random)
+    const ref = tracks[0].anchor && mode === "random" ? tracks[0].anchor : tracks[0].hand;
+    if (!ref || list.length === 1) return [list[0]];
+    let best = 0;
+    for (let i = 1; i < list.length; i++) if (d(centers[i], ref) < d(centers[best], ref)) best = i;
+    return [list[best]];
+  }
+  // Hai track: nếu đã có mốc (neo hoặc vị trí cũ) cho cả hai → ghép theo khoảng cách gần nhất
+  const refs = tracks.map((tr) => tr.anchor || tr.hand);
+  if (refs.every(Boolean)) {
+    const pairs = [];
+    refs.forEach((r, ti) => centers.forEach((c, ci) => pairs.push({ ti, ci, dist: d(c, r) })));
+    pairs.sort((a, b) => a.dist - b.dist);
+    const out = [null, null], used = new Set();
+    for (const p of pairs) {
+      if (out[p.ti] || used.has(p.ci)) continue;
+      out[p.ti] = list[p.ci]; used.add(p.ci);
+    }
+    return out;
+  }
+  // Chưa có mốc: xếp theo chiều ngang, track 0 = tay bên trái khung (chưa lật gương)
+  const order = centers.map((c, i) => i).sort((a, b) => centers[a].x - centers[b].x);
+  return [list[order[0]] ?? null, list[order[1]] ?? null];
 }
 
-// Toạ độ tay so với trụ: `along` dọc trục (dương = về phía ngón út), `perp` lệch ngang
-function rodCoords(h, aspect) {
-  const dx = (h.x - anchor.x) * aspect;
-  const dy = h.y - anchor.y;
-  return { along: dx * anchor.ux + dy * anchor.uy, perp: Math.abs(dx * anchor.uy - dy * anchor.ux) };
+// ---------- Random: sinh trụ ở chỗ mới ----------
+function spawnRod() {
+  const tr = tracks[0];
+  const aspect = overlay.width / overlay.height || 4 / 3;
+  const prev = tr.anchor;
+  let x, y, tries = 0;
+  do {
+    x = 0.25 + Math.random() * 0.5;
+    y = 0.3 + Math.random() * 0.4;
+  } while (prev && Math.hypot((x - prev.x) * aspect, y - prev.y) < RND_MIN_JUMP && ++tries < 20);
+  const tilt = ((Math.random() * 2 - 1) * RND_TILT_MAX * Math.PI) / 180;
+  tr.anchor = { x, y, size: refSize, ux: Math.sin(tilt), uy: Math.cos(tilt) };
+  tr.clearMotion();
+  tr.invalidSince = null;
+  rodSpawnAt = performance.now();
+  rodHasStroke = false;
+  beep(990, 60, 0.07, "sine");
+  setTimeout(() => beep(1320, 60, 0.07, "sine"), 70);
 }
+const rodLife = (elapsedSec) => Math.max(RND_ROD_LIFE_MIN, RND_ROD_LIFE_MAX - elapsedSec * RND_ROD_LIFE_STEP);
 
-function isOnRod(h, aspect) {
-  if (!anchor || h.released) return false;
-  const { along, perp } = rodCoords(h, aspect);
-  return perp < anchor.size * ROD_TOL_X && Math.abs(along) < anchor.size * ROD_HALF_LEN;
-}
-
-// ---------- Xử lý mẫu ----------
-// `y` là toạ độ dọc trục đếm: trước khi có neo là y màn hình, có neo rồi là vị trí dọc trục trụ
-function feedSample(y, size, now) {
-  smoothY = smoothY === null ? y : smoothY * 0.35 + y * 0.65;
-  const rev = detector.push(smoothY, Math.max(0.015, size * STROKE_THR));
-  if (rev === "bottom") onStroke(now);
-  else if (rev === "top") beep(330, 30, 0.03);
-}
-
-function onStroke(now) {
+// ---------- Xử lý một nhát ----------
+function onStroke(tr, now) {
   strokes.push(now);
   beep(440 + currentRate(now) * 120, 45, 0.06);
   if (state !== "playing") return;
   count++;
+  tr.count++;
   const sec = Math.floor((now - playStart) / 1000);
-  if (sec < duration) bins[sec] = (bins[sec] || 0) + 1;
+  if (isTimed() ? sec < duration : true) bins[sec] = (bins[sec] || 0) + 1;
+  if (mode === "random") {
+    meter = Math.min(100, meter + RND_STROKE_GAIN);
+    if (!rodHasStroke) { rodHasStroke = true; rodsCaught++; }
+  }
   $("hud-count").textContent = count;
+  if (mode === "double") $("hud-split").textContent = `${tracks[0].count} + ${tracks[1].count}`;
   const el = $("hud-count").parentElement;
   el.classList.remove("bump");
   void el.offsetWidth;
@@ -437,84 +620,111 @@ function currentRate(now) {
   return strokes.length / (RATE_WINDOW_MS / 1000);
 }
 
+// ---------- Xử lý một khung hình camera ----------
 function processFrame(res, now) {
   const aspect = overlay.width / overlay.height;
+  const assigned = assignHands(res.landmarks || [], aspect);
   // Xóc nhanh làm tay nhòe nên mô hình hay mất tay vài khung liền. Trong LOST_HAND_MS
   // vẫn giữ trạng thái tay gần nhất thay vì coi là sai tư thế.
-  const seen = res.landmarks && res.landmarks.length ? analyzeHand(res.landmarks[0], aspect) : null;
-  if (seen) { hand = seen; lastHandAt = now; }
-  else if (now - lastHandAt > LOST_HAND_MS) { hand = null; curlEma = null; detector.reset(); smoothY = null; }
+  const seen = tracks.map((tr, i) => {
+    const lm = assigned[i];
+    if (lm) { tr.hand = tr.analyze(lm, aspect); tr.lastAt = now; return tr.hand; }
+    if (!tr.visible(now)) { tr.hand = null; tr.curlEma = null; tr.clearMotion(); }
+    return null;
+  });
+  const hands = tracks.map((tr) => tr.hand);
+  const anyOpen = hands.some((h) => h && h.open);
 
   let progress = 0;
   if (state === "ready" || state === "result") {
-    progress = palmHold.update(!!hand && hand.open, now);
+    progress = palmHold.update(anyOpen, now);
+    const openHand = hands.find((h) => h && h.open);
+    if (openHand) refSize = openHand.size;
     setGesture(t(state === "ready" ? "gPalmReady" : "gPalmReplay"), progress);
     if (progress >= 1) { enterAnchor(); return; }
   } else if (state === "anchor") {
-    // Nắm tay như cầm trụ và giữ yên → đặt điểm neo tại đó
-    const inZone = !!hand && Math.abs(hand.x - 0.5) < ANCHOR_ZONE_X && Math.abs(hand.y - 0.5) < ANCHOR_ZONE_Y;
-    const gripping = !!hand && hand.grip && inZone;
-    if (!gripping) { anchorRef = null; axisEma = null; }
-    else if (!anchorRef || Math.hypot((hand.x - anchorRef.x) * aspect, hand.y - anchorRef.y) > hand.size * ANCHOR_STILL) {
-      anchorRef = { x: hand.x, y: hand.y }; // tay dịch chuyển → đếm lại từ đầu
-      anchorHold.reset();
-      axisEma = null;
-    }
-    if (gripping && seen) {
-      // Làm mượt trục tay trong lúc giữ yên; lật dấu nếu khung này ngược với trung bình
-      if (!axisEma) axisEma = { ux: seen.ux, uy: seen.uy };
-      else {
-        const s = seen.ux * axisEma.ux + seen.uy * axisEma.uy < 0 ? -1 : 1;
-        axisEma.ux = axisEma.ux * 0.8 + s * seen.ux * 0.2;
-        axisEma.uy = axisEma.uy * 0.8 + s * seen.uy * 0.2;
-      }
-    }
-    progress = anchorHold.update(gripping, now);
-    setGesture(t(!hand || !hand.grip ? "gGrip" : !inZone ? "gCenter" : "gHold"), progress);
+    progress = updateAnchorPhase(hands, seen, aspect, now);
     if (progress >= 1) {
-      const len = Math.hypot(axisEma.ux, axisEma.uy) || 1;
-      anchor = { x: hand.x, y: hand.y, size: hand.size, ux: axisEma.ux / len, uy: axisEma.uy / len };
-      detector.reset();
-      smoothY = null;
+      tracks.forEach((tr) => tr.commitAnchor(tr.hand));
       startCountdown();
     }
   } else if (state === "countdown") {
-    setGesture(t("gCountdown"));
+    setGesture(t(mode === "random" ? "gCountdownRandom" : "gCountdown"));
   }
 
-  // Kiểm tra bám trụ khi đang đếm ngược / chơi
-  // Khung không thấy tay thì giữ nguyên kết quả khung trước
-  if (!hand) onRod = false;
-  else if (seen && (state === "countdown" || state === "playing")) {
-    onRod = isOnRod(hand, aspect);
-    if (onRod) invalidSince = null;
-    else if (invalidSince === null) invalidSince = now;
+  // Kiểm tra bám trụ khi đang đếm ngược / chơi. Khung không thấy tay thì giữ nguyên kết quả khung trước.
+  const active = state === "countdown" || state === "playing";
+  tracks.forEach((tr, i) => {
+    if (!tr.hand) { tr.onRod = false; return; }
+    if (!seen[i] || !active) return;
+    tr.onRod = tr.isOnRod(tr.hand, aspect);
+    if (tr.onRod) tr.invalidSince = null;
+    else if (tr.invalidSince === null) tr.invalidSince = now;
     // Sai tư thế hoặc rời trụ quá lâu → huỷ nhát đang dở, phải xóc lại trọn nhát trên trụ
-    if (invalidSince !== null && now - invalidSince > INVALID_GRACE_MS) detector.reset();
-    if (state === "playing") { framesTotal++; if (onRod) framesOnRod++; }
+    if (tr.invalidSince !== null && now - tr.invalidSince > INVALID_GRACE_MS) tr.detector.reset();
+  });
+  if (state === "playing") {
+    framesTotal++;
+    if (tracks.every((tr) => tr.onRod)) framesOnRod++;
   }
 
-  if (seen) {
-    if (anchor) feedSample(rodCoords(seen, aspect).along, anchor.size, now);
-    else feedSample(seen.y, seen.size, now);
-  }
+  // Đưa mẫu vào bộ đếm: có neo thì theo trục trụ, chưa có thì theo chiều dọc màn hình
+  tracks.forEach((tr, i) => {
+    const h = seen[i];
+    if (!h) return;
+    const rev = tr.anchor ? tr.feed(tr.rodCoords(h, aspect).along, tr.anchor.size) : tr.feed(h.y, h.size);
+    if (rev === "bottom") onStroke(tr, now);
+    else if (rev === "top") beep(330, 30, 0.03);
+  });
   draw(seen, progress);
+}
+
+// Bước đặt neo: mọi tay phải nắm, ở trong vùng cho phép, và giữ yên cùng lúc
+function updateAnchorPhase(hands, seen, aspect, now) {
+  const need = tracks.length;
+  const present = hands.filter(Boolean);
+  const zoneX = need === 2 ? DOUBLE_ZONE_X : ANCHOR_ZONE_X;
+  const inZone = (h) => Math.abs(h.x - 0.5) < zoneX && Math.abs(h.y - 0.5) < ANCHOR_ZONE_Y;
+  let ok = present.length === need && present.every((h) => h.grip && inZone(h));
+  let apart = true;
+  if (ok && need === 2) {
+    const [a, b] = hands;
+    apart = Math.hypot((a.x - b.x) * aspect, a.y - b.y) > HAND_MIN_GAP * Math.max(a.size, b.size);
+    ok = apart;
+  }
+  if (ok) {
+    tracks.forEach((tr, i) => { if (!tr.updateStill(tr.hand, aspect)) anchorHold.reset(); if (seen[i]) tr.accumulateAxis(seen[i]); });
+  } else {
+    tracks.forEach((tr) => { tr.anchorRef = null; tr.axisEma = null; });
+  }
+  const progress = anchorHold.update(ok, now);
+  let msg;
+  if (present.length < need) msg = need === 2 ? "gTwoHands" : "gGrip";
+  else if (!present.every((h) => h.grip)) msg = need === 2 ? "gGripBoth" : "gGrip";
+  else if (!present.every(inZone)) msg = "gCenter";
+  else if (!apart) msg = "gApart";
+  else msg = "gHold";
+  setGesture(t(msg), progress);
+  return progress;
 }
 
 // ---------- Vẽ lớp phủ ----------
 function draw(seen, progress) {
   const w = overlay.width, h = overlay.height;
   octx.clearRect(0, 0, w, h);
+  const active = state === "countdown" || state === "playing";
 
-  if (anchor && (state === "countdown" || state === "playing")) {
-    const half = anchor.size * ROD_HALF_LEN * h;
-    const tol = anchor.size * ROD_TOL_X * h;
+  for (const tr of tracks) {
+    if (!tr.anchor || !active) continue;
+    const a = tr.anchor;
+    const half = a.size * ROD_HALF_LEN * h;
+    const tol = a.size * ROD_TOL_X * h;
     // Trắng: đúng trụ · Đỏ: buông tay / lệch trụ · Xám: mất dấu tay
-    const color = !hand ? "#8b8b8b" : onRod ? "#f2f2f2" : "#ff3b3b";
+    const color = !tr.hand ? "#8b8b8b" : tr.onRod ? "#f2f2f2" : "#ff3b3b";
     // Vẽ trong hệ toạ độ của trụ: gốc tại điểm neo, trục y cục bộ trùng trục trụ
     octx.save();
-    octx.translate(anchor.x * w, anchor.y * h);
-    octx.rotate(Math.atan2(anchor.uy, anchor.ux) - Math.PI / 2);
+    octx.translate(a.x * w, a.y * h);
+    octx.rotate(Math.atan2(a.uy, a.ux) - Math.PI / 2);
     // Vùng hợp lệ: viền nét đứt mảnh
     octx.strokeStyle = color;
     octx.globalAlpha = 0.5;
@@ -525,7 +735,7 @@ function draw(seen, progress) {
     octx.stroke();
     octx.setLineDash([]);
     // Thanh trụ: một khối đặc
-    const rodW = anchor.size * 0.3 * h;
+    const rodW = a.size * 0.3 * h;
     octx.globalAlpha = 0.85;
     octx.fillStyle = color;
     octx.beginPath();
@@ -536,47 +746,66 @@ function draw(seen, progress) {
     octx.fillStyle = "#0b0b0b";
     octx.fillRect(-rodW / 2, -1.5, rodW, 3);
     octx.restore();
+    // Random: vòng lan toả khi trụ vừa xuất hiện
+    if (mode === "random") {
+      const age = (performance.now() - rodSpawnAt) / 500;
+      if (age < 1) {
+        octx.globalAlpha = 1 - age;
+        octx.lineWidth = 2;
+        octx.strokeStyle = "#f2f2f2";
+        octx.beginPath();
+        octx.arc(a.x * w, a.y * h, (0.5 + age * 2) * half, 0, Math.PI * 2);
+        octx.stroke();
+        octx.globalAlpha = 1;
+      }
+    }
   }
 
-  if (!seen) return;
-  const { lm } = seen;
-  octx.globalAlpha = 0.9;
-  octx.fillStyle = seen.released ? "#ff3b3b" : "#f2f2f2";
-  for (const p of lm) {
-    octx.beginPath();
-    octx.arc(p.x * w, p.y * h, 2.5, 0, Math.PI * 2);
-    octx.fill();
-  }
-  octx.globalAlpha = 1;
-  // Vòng tiến độ cử chỉ quanh lòng bàn tay
-  if (progress > 0) {
-    const r = seen.size * 0.9 * h;
-    octx.lineWidth = 3;
-    octx.strokeStyle = "rgba(242,242,242,.25)";
-    octx.beginPath();
-    octx.arc(seen.x * w, seen.y * h, r, 0, Math.PI * 2);
-    octx.stroke();
-    octx.strokeStyle = "#f2f2f2";
-    octx.beginPath();
-    octx.arc(seen.x * w, seen.y * h, r, -Math.PI / 2, -Math.PI / 2 + progress * Math.PI * 2);
-    octx.stroke();
-  }
+  seen.forEach((hd) => {
+    if (!hd) return;
+    octx.globalAlpha = 0.9;
+    octx.fillStyle = hd.released ? "#ff3b3b" : "#f2f2f2";
+    for (const p of hd.lm) {
+      octx.beginPath();
+      octx.arc(p.x * w, p.y * h, 2.5, 0, Math.PI * 2);
+      octx.fill();
+    }
+    octx.globalAlpha = 1;
+    // Vòng tiến độ cử chỉ quanh lòng bàn tay
+    if (progress > 0) {
+      const r = hd.size * 0.9 * h;
+      octx.lineWidth = 3;
+      octx.strokeStyle = "rgba(242,242,242,.25)";
+      octx.beginPath();
+      octx.arc(hd.x * w, hd.y * h, r, 0, Math.PI * 2);
+      octx.stroke();
+      octx.strokeStyle = "#f2f2f2";
+      octx.beginPath();
+      octx.arc(hd.x * w, hd.y * h, r, -Math.PI / 2, -Math.PI / 2 + progress * Math.PI * 2);
+      octx.stroke();
+    }
+  });
 }
 
-// ---------- Chế độ phím / chạm ----------
+// ---------- Chế độ phím / chạm (chỉ single) ----------
 const KEY_Y = { ArrowUp: 0.3, KeyW: 0.3, ArrowDown: 0.7, KeyS: 0.7 };
+function keyboardSample(y) {
+  const now = performance.now();
+  const tr = tracks[0];
+  tr.lastAt = now;
+  const rev = tr.feed(y, 0.2);
+  if (rev === "bottom") onStroke(tr, now);
+}
 window.addEventListener("keydown", (e) => {
   if (input !== "keyboard" || !(e.code in KEY_Y)) return;
   e.preventDefault();
   if (e.repeat) return;
-  lastHandAt = performance.now();
-  feedSample(KEY_Y[e.code], 0.2, performance.now());
+  keyboardSample(KEY_Y[e.code]);
 });
 document.querySelector(".cam-wrap").addEventListener("pointerdown", (e) => {
   if (input !== "keyboard" || (state !== "playing" && state !== "countdown")) return;
   const r = e.currentTarget.getBoundingClientRect();
-  lastHandAt = performance.now();
-  feedSample((e.clientY - r.top) / r.height < 0.5 ? 0.3 : 0.7, 0.2, performance.now());
+  keyboardSample((e.clientY - r.top) / r.height < 0.5 ? 0.3 : 0.7);
 });
 
 // ---------- Vòng chơi ----------
@@ -599,48 +828,77 @@ function startCountdown() {
 
 function startPlaying() {
   count = 0;
-  bins = new Array(duration).fill(0);
+  for (const tr of tracks) tr.count = 0;
+  bins = isTimed() ? new Array(duration).fill(0) : [];
   strokes = [];
   framesOnRod = 0;
   framesTotal = 0;
+  meter = RND_METER_START;
+  rodsCaught = 0;
+  rodHasStroke = false;
   playStart = performance.now();
+  lastTick = playStart;
+  if (mode === "random") rodSpawnAt = playStart;
   $("hud-count").textContent = "0";
+  $("hud-split").textContent = mode === "double" ? "0 + 0" : "";
   show("playing");
 }
+
+function tierIndex(mins, v) { return mins.filter((m) => v >= m).length - 1; }
 
 function finish() {
   show("result");
   beep(220, 400, 0.1, "sawtooth");
-  const avg = count / duration;
+  const elapsed = (performance.now() - playStart) / 1000;
   const prev = getBest();
-  if (count > prev) localStorage.setItem(bestKey(), String(count));
-  lastResult = {
-    avg,
-    count,
-    duration,
-    peak: Math.max(0, ...bins),
-    bins: [...bins],
-    tier: TIER_MIN.filter((m) => avg >= m).length - 1,
-    gripPct: input === "camera" && framesTotal ? Math.round((framesOnRod / framesTotal) * 100) : null,
-    prevBest: prev,
-  };
+  let r;
+  if (isTimed()) {
+    const avg = count / duration;
+    r = {
+      hero: avg.toFixed(2), score: count, avg,
+      tier: tierIndex(TIER_MIN, mode === "double" ? avg / 2 : avg),
+      stats: [[t("total"), mode === "double" ? `${tracks[0].count} + ${tracks[1].count}` : count], [t("peak"), Math.max(0, ...bins)]],
+      gripPct: input === "camera" && framesTotal ? Math.round((framesOnRod / framesTotal) * 100) : null,
+    };
+    if (r.gripPct !== null) r.stats.push([t("gripLabel"), `${r.gripPct}%`]);
+  } else {
+    const survived = Math.round(elapsed * 10) / 10;
+    r = {
+      hero: survived.toFixed(1), score: survived, survived,
+      tier: tierIndex(RND_TIER_SEC, survived),
+      stats: [[t("total"), count], [t("rods"), rodsCaught], [t("peak"), Math.max(0, ...bins)]],
+    };
+  }
+  r.count = count; r.duration = duration; r.bins = [...bins]; r.peak = Math.max(0, ...bins);
+  r.rods = rodsCaught; r.prevBest = prev; r.mode = mode;
+  if (r.score > prev) localStorage.setItem(bestKey(), String(r.score));
+  lastResult = r;
   renderResult();
-  if (avg >= 3) say("Ambatukam!");
+  if (r.tier >= 3) say("Ambatukam!");
 }
 
 function renderResult() {
   const r = lastResult;
   const [title, note] = t("tiers")[r.tier];
-  $("res-avg").textContent = r.avg.toFixed(2);
+  $("res-hero").textContent = r.hero;
+  $("res-unit").textContent = t(isTimed() ? "avg" : "survived");
   $("res-title").textContent = title;
   $("res-note").textContent = note;
-  $("res-total").textContent = r.count;
-  $("res-peak").textContent = r.peak;
-  $("res-grip-wrap").classList.toggle("hidden", r.gripPct === null);
-  $("res-grip").textContent = r.gripPct === null ? "" : `${r.gripPct}%`;
-  $("res-best").textContent = r.count > r.prevBest
+  // Nhãn thống kê phụ thuộc ngôn ngữ: dựng lại từ dữ liệu thô
+  const stats = isTimed()
+    ? [[t("total"), r.mode === "double" ? `${tracks[0].count} + ${tracks[1].count}` : r.count], [t("peak"), r.peak]]
+    : [[t("total"), r.count], [t("rods"), r.rods], [t("peak"), r.peak]];
+  if (isTimed() && r.gripPct !== null) stats.push([t("gripLabel"), `${r.gripPct}%`]);
+  [1, 2, 3].forEach((i) => {
+    const s = stats[i - 1];
+    $(`res-l${i}`).textContent = s ? s[0] : "";
+    $(`res-s${i}`).textContent = s ? s[1] : "";
+  });
+  $("res-w3").classList.toggle("hidden", stats.length < 3);
+  const isNew = r.score > r.prevBest;
+  $("res-best").textContent = isNew
     ? (r.prevBest ? t("newBest", r.prevBest) : t("firstBest"))
-    : t("bestShort", r.prevBest, r.duration);
+    : (isTimed() ? t("bestShort", r.prevBest, r.duration) : t("bestShortRandom", r.prevBest));
   drawChart($("res-chart"), r.bins, r.peak);
 }
 
@@ -648,13 +906,15 @@ function drawChart(canvas, data, peak) {
   const ctx = canvas.getContext("2d");
   const w = canvas.width, h = canvas.height, pad = 16, top = 22;
   ctx.clearRect(0, 0, w, h);
+  const n = Math.max(1, data.length);
   const max = Math.max(MAX_RATE, ...data);
-  const bw = (w - pad * 2) / data.length;
-  data.forEach((v, i) => {
+  const bw = (w - pad * 2) / n;
+  for (let i = 0; i < n; i++) {
+    const v = data[i] || 0;
     const bh = (v / max) * (h - pad - top);
     ctx.fillStyle = v === peak && v > 0 ? "#ff3b3b" : "#555";
     ctx.fillRect(pad + i * bw + 1, h - pad - bh, Math.max(1, bw - 2), bh);
-  });
+  }
   ctx.fillStyle = "#2a2a2a";
   ctx.fillRect(pad, h - pad, w - pad * 2, 1);
   ctx.fillStyle = "#8b8b8b";
@@ -662,7 +922,7 @@ function drawChart(canvas, data, peak) {
   ctx.fillText(t("chartLabel").toUpperCase(), pad, 12);
   ctx.fillText("0s", pad, h - 3);
   ctx.textAlign = "right";
-  ctx.fillText(`${data.length}s`, w - pad, h - 3);
+  ctx.fillText(`${n}s`, w - pad, h - 3);
   ctx.textAlign = "left";
 }
 
@@ -679,23 +939,24 @@ async function shareResult() {
   ctx.fillRect(80, 96, 28, 28);
   ctx.fillStyle = "#f2f2f2";
   ctx.font = "800 40px system-ui";
-  ctx.fillText("AMBATUKAM", 130, 124);
+  ctx.fillText(`AMBATUKAM · ${t("mode" + r.mode[0].toUpperCase() + r.mode.slice(1)).toUpperCase()}`, 130, 124);
   ctx.font = "700 260px ui-monospace, Menlo, monospace";
-  ctx.fillText(r.avg.toFixed(2), 80, 480);
+  ctx.fillText(r.hero, 80, 480);
   ctx.fillStyle = "#8b8b8b";
   ctx.font = "32px system-ui";
-  ctx.fillText(t("avg").toUpperCase(), 84, 540);
+  ctx.fillText(t(isTimed() ? "avg" : "survived").toUpperCase(), 84, 540);
   ctx.fillStyle = "#f2f2f2";
   ctx.font = "800 72px system-ui";
   ctx.fillText(title, 80, 680);
   ctx.fillStyle = "#8b8b8b";
   ctx.font = "36px system-ui";
-  ctx.fillText(t("shareSub", r.count, r.duration, r.peak), 80, 740);
+  ctx.fillText(isTimed() ? t("shareSub", r.count, r.duration, r.peak) : t("shareSubRandom", r.count, r.rods), 80, 740);
   ctx.drawImage($("res-chart"), 80, 800, 920, 180);
   const blob = await new Promise((res) => c.toBlob(res, "image/png"));
   const file = new File([blob], "ambatukam-score.png", { type: "image/png" });
+  const text = isTimed() ? t("shareText", r.hero) : t("shareTextRandom", r.hero);
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try { await navigator.share({ files: [file], title: "Ambatukam Game", text: t("shareText", r.avg.toFixed(2)) }); return; } catch {}
+    try { await navigator.share({ files: [file], title: "Ambatukam Game", text }); return; } catch {}
   }
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
@@ -714,60 +975,79 @@ function loop() {
     processFrame(landmarker.detectForVideo(video, now), now);
   }
 
-  // Thanh lực
+  // Random: Lửa cạn dần, trụ đổi chỗ
+  if (state === "playing" && mode === "random") {
+    const elapsed = (now - playStart) / 1000;
+    const dt = (now - lastTick) / 1000;
+    meter -= (RND_DRAIN_BASE + RND_DRAIN_RAMP * elapsed) * dt;
+    if (now - rodSpawnAt > rodLife(elapsed)) spawnRod();
+    if (meter <= 0) { meter = 0; finish(); }
+  }
+  lastTick = now;
+
+  // Thanh bên: lực (nhát/giây) hoặc Lửa (random)
   const rate = currentRate(now);
   displayRate += (rate - displayRate) * 0.2;
-  const pct = Math.min(1, displayRate / MAX_RATE);
+  const pct = mode === "random" && (state === "playing" || state === "result") ? meter / 100 : Math.min(1, displayRate / MAX_RATE);
   const fill = $("power-fill");
   fill.style.height = (pct * 100).toFixed(1) + "%";
   fill.style.setProperty("--pct", (pct * 100).toFixed(1) + "%"); // bản mobile nằm ngang
-  $("power-bar").classList.toggle("maxed", pct > 0.95);
-  $("power-value").textContent = displayRate.toFixed(1);
+  $("power-bar").classList.toggle("maxed", mode !== "random" && pct > 0.95);
+  $("power-bar").classList.toggle("low", mode === "random" && state === "playing" && pct < 0.3);
+  const showHeat = mode === "random" && (state === "playing" || state === "result");
+  $("power-value").textContent = showHeat ? Math.round(meter) : displayRate.toFixed(1);
+  $("power-unit").textContent = showHeat ? "%" : t("perSec");
+  const tr = tracks[0];
   const marker = $("power-hand");
-  const visible = smoothY !== null && handVisible();
+  const visible = tracks.length === 1 && tr.smooth !== null && tr.visible(now);
   marker.classList.toggle("on", visible);
   if (visible) {
-    // Có neo: smoothY là vị trí dọc trụ (−half..half) → quy về 0..1 theo chiều dài trụ
-    const pos = anchor && input === "camera" ? 0.5 + smoothY / (2 * anchor.size * ROD_HALF_LEN) : smoothY;
+    // Có neo: smooth là vị trí dọc trụ (−half..half) → quy về 0..1 theo chiều dài trụ
+    const pos = tr.anchor && input === "camera" ? 0.5 + tr.smooth / (2 * tr.anchor.size * ROD_HALF_LEN) : tr.smooth;
     marker.style.top = `calc(${(Math.min(1, Math.max(0, pos)) * 100).toFixed(1)}% - 1px)`;
   }
 
   if (state === "playing") {
-    const left = Math.max(0, duration - (now - playStart) / 1000);
-    $("hud-time").textContent = left.toFixed(1);
+    const elapsed = (now - playStart) / 1000;
+    const left = Math.max(0, duration - elapsed);
+    $("hud-time").textContent = (isTimed() ? left : elapsed).toFixed(1);
     let status = "";
     if (input === "camera") {
-      if (!hand) status = t("sLost");
-      else if (hand.released) status = t("sGrip");
-      else if (!onRod) status = t("sAnchor");
+      const missing = tracks.filter((x) => !x.hand).length;
+      if (missing === tracks.length) status = t("sLost");
+      else if (missing) status = t("sOneHand");
+      else if (tracks.some((x) => x.hand.released)) status = t("sGrip");
+      else if (tracks.some((x) => !x.onRod)) status = t(mode === "random" ? "sGoRod" : "sAnchor");
     }
     $("hud-status").textContent = status;
-    if (left <= 0) finish();
+    if (isTimed() && left <= 0) finish();
   }
 }
 
 // Hook để test logic bằng dữ liệu tay giả: mở trang với ?debug
-// Thêm &auto=result|play&lang=vi để nhảy thẳng tới một màn hình (chụp ảnh giao diện).
+// Thêm &auto=result|play&mode=single|double|random&lang=vi để nhảy thẳng tới một màn hình.
 const params = new URLSearchParams(location.search);
 if (params.has("debug")) {
   window.__amb = {
     processFrame,
-    useFakeCamera() { input = "camera"; overlay.width = 640; overlay.height = 480; show("ready"); },
+    useFakeCamera() { input = "camera"; setupTracks(); overlay.width = 640; overlay.height = 480; show("ready"); },
+    setMode(m) { mode = m; renderModeTexts(); },
     get state() { return state; },
     get count() { return count; },
-    get anchor() { return anchor; },
-    get onRod() { return onRod; },
+    get counts() { return tracks.map((x) => x.count); },
+    get anchors() { return tracks.map((x) => x.anchor); },
+    get onRod() { return tracks.map((x) => x.onRod); },
+    get meter() { return meter; },
+    get rods() { return rodsCaught; },
   };
   if (params.get("lang")) lang = params.get("lang");
+  if (params.get("mode")) mode = params.get("mode");
   const auto = params.get("auto");
   if (auto) {
     window.__amb.useFakeCamera();
     duration = 10;
-    // Trụ nghiêng 25° để thấy rõ trục theo tay
-    const tilt = (25 * Math.PI) / 180;
-    anchor = { x: 0.5, y: 0.5, size: 0.14, ux: Math.sin(tilt), uy: Math.cos(tilt) };
-    // Tay nắm giả: cổ tay bên trái, các khớp xếp dọc theo trục trụ
-    const fakeHand = (cx, cy) => {
+    // Tay nắm giả: cổ tay bên trái, các khớp xếp dọc theo trục trụ nghiêng `tilt`
+    const fakeHand = (cx, cy, tilt) => {
       const aspect = overlay.width / overlay.height;
       const rot = (dx, dy) => ({ x: cx + (dx * Math.cos(tilt) - dy * Math.sin(tilt)) / aspect, y: cy + dx * Math.sin(tilt) + dy * Math.cos(tilt), z: 0 });
       const lm = Array.from({ length: 21 }, () => rot(0, 0));
@@ -778,13 +1058,20 @@ if (params.has("debug")) {
       });
       return lm;
     };
+    const tilts = mode === "double" ? [-0.35, 0.35] : [0.44];
+    const xs = mode === "double" ? [0.3, 0.7] : [0.5];
+    tracks.forEach((tr, i) => { tr.anchor = { x: xs[i], y: 0.5, size: 0.14, ux: Math.sin(tilts[i]), uy: Math.cos(tilts[i]) }; });
     if (auto === "play") {
       startPlaying();
       count = 12; $("hud-count").textContent = count;
+      if (mode === "double") { tracks[0].count = 5; tracks[1].count = 7; $("hud-split").textContent = "5 + 7"; }
+      if (mode === "random") { meter = 62; rodSpawnAt = performance.now() - 1000; }
       for (let i = 0; i < 6; i++) strokes.push(performance.now() - i * 200);
-      processFrame({ landmarks: [fakeHand(0.5, 0.5)] }, performance.now());
+      processFrame({ landmarks: tracks.map((tr, i) => fakeHand(xs[i], 0.5, tilts[i])) }, performance.now());
     } else {
       count = 39; bins = [3, 4, 4, 5, 4, 4, 4, 4, 4, 3]; framesTotal = 100; framesOnRod = 82;
+      if (mode === "double") { tracks[0].count = 19; tracks[1].count = 20; }
+      if (mode === "random") { rodsCaught = 6; playStart = performance.now() - 23400; }
       finish();
     }
   }

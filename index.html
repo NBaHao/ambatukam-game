@@ -30,7 +30,14 @@
       <!-- Màn hình bắt đầu -->
       <div id="screen-start" class="screen">
         <h1 data-i18n="title"></h1>
-        <p class="sub" data-i18n="sub"></p>
+        <div class="modes" id="modes">
+          <button data-mode="single"><b data-i18n="modeSingle"></b><span data-i18n="modeSingleDesc"></span></button>
+          <button data-mode="double"><b data-i18n="modeDouble"></b><span data-i18n="modeDoubleDesc"></span></button>
+          <button data-mode="random"><b data-i18n="modeRandom"></b><span data-i18n="modeRandomDesc"></span></button>
+          <button disabled><b data-i18n="modeRank"></b><span data-i18n="soon"></span></button>
+          <button disabled><b data-i18n="modePvp"></b><span data-i18n="soon"></span></button>
+        </div>
+        <p class="sub" id="sub"></p>
         <div class="seg" id="durations">
           <button data-d="10">10s</button>
           <button data-d="20" class="active">20s</button>
@@ -46,11 +53,7 @@
       <div id="screen-ready" class="screen clear hidden">
         <div class="card">
           <p class="hint" id="ready-hint"></p>
-          <ol class="steps">
-            <li data-i18n="step1"></li>
-            <li data-i18n="step2"></li>
-            <li data-i18n="step3"></li>
-          </ol>
+          <ol class="steps" id="steps"></ol>
           <button id="btn-go" class="btn primary hidden" data-i18n="go"></button>
         </div>
       </div>
@@ -62,21 +65,21 @@
       <div id="hud" class="hud hidden">
         <div class="hud-timer"><span id="hud-time">20.0</span></div>
         <div class="hud-status" id="hud-status"></div>
-        <div class="hud-count"><span id="hud-count">0</span><small data-i18n="strokes"></small></div>
+        <div class="hud-count"><span id="hud-count">0</span><small data-i18n="strokes"></small><span class="hud-split" id="hud-split"></span></div>
       </div>
 
       <!-- Kết quả -->
       <div id="screen-result" class="screen hidden">
         <div class="res-hero">
-          <span class="res-num" id="res-avg">0.00</span>
-          <span class="res-unit" data-i18n="avg"></span>
+          <span class="res-num" id="res-hero">0.00</span>
+          <span class="res-unit" id="res-unit"></span>
         </div>
         <h2 id="res-title"></h2>
         <p class="res-note" id="res-note"></p>
         <dl class="res-stats">
-          <div><dt data-i18n="total"></dt><dd id="res-total">0</dd></div>
-          <div><dt data-i18n="peak"></dt><dd id="res-peak">0</dd></div>
-          <div id="res-grip-wrap"><dt data-i18n="gripLabel"></dt><dd id="res-grip">–</dd></div>
+          <div><dt id="res-l1"></dt><dd id="res-s1">0</dd></div>
+          <div><dt id="res-l2"></dt><dd id="res-s2">0</dd></div>
+          <div id="res-w3"><dt id="res-l3"></dt><dd id="res-s3">0</dd></div>
         </dl>
         <canvas id="res-chart" width="560" height="110"></canvas>
         <p class="best" id="res-best"></p>
@@ -90,12 +93,12 @@
 
     <!-- Thanh lực -->
     <aside class="power">
-      <div class="power-label" data-i18n="power"></div>
+      <div class="power-label" id="power-label"></div>
       <div class="power-bar" id="power-bar">
         <div class="power-fill" id="power-fill"></div>
         <div class="power-hand" id="power-hand"></div>
       </div>
-      <div class="power-value"><span id="power-value">0.0</span><small data-i18n="perSec"></small></div>
+      <div class="power-value"><span id="power-value">0.0</span><small id="power-unit"></small></div>
     </aside>
   </main>
 
