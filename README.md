@@ -2,7 +2,7 @@
 
 Game meme chơi bằng webcam: nắm tay như cầm một thanh trụ, xóc lên xuống thật nhanh. Hết giờ, game tính tốc độ trung bình (nhát/giây) và xếp danh hiệu.
 
-Lấy cảm hứng từ trend "67 speed". Toàn bộ nhận diện tay chạy trong trình duyệt bằng [MediaPipe Hand Landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker). Không có backend, video không rời khỏi máy người chơi.
+Toàn bộ nhận diện tay chạy trong trình duyệt. Không có backend, video không rời khỏi máy người chơi.
 
 > Game giải trí lành mạnh cho 16+. Không có hình ảnh nhạy cảm. Mục đích: vui, theo trend, và vận động cơ tay.
 
@@ -99,7 +99,7 @@ MIT
 
 Webcam meme game: grip like you're holding a rod, stroke up and down as fast as you can. When time's up you get your average strokes/sec and a rank.
 
-Inspired by the "67 speed" trend. Hand tracking runs entirely in the browser with MediaPipe Hand Landmarker. No backend; video never leaves the device. For fun, 16+, no explicit imagery.
+Hand tracking runs entirely in the browser. No backend; video never leaves the device. For fun, 16+, no explicit imagery.
 
 **Run locally:** any static server works, e.g. `python3 -m http.server 5173`, then open http://localhost:5173. Camera access requires `localhost` or HTTPS.
 
