@@ -377,6 +377,7 @@ let state = "start";          // start | ready | anchor | countdown | playing | 
 let input = null;             // "camera" | "keyboard"
 let landmarker = null;
 let lastVideoTime = -1;
+let lastDetectAt = 0;
 let tracks = [new HandTrack()];
 let strokes = [];             // timestamp mọi nhát (để tính tốc độ tức thời)
 let count = 0;
@@ -386,6 +387,8 @@ let displayRate = 0;
 let framesOnRod = 0;
 let framesTotal = 0;
 let lastResult = null;        // để vẽ lại màn kết quả khi đổi ngôn ngữ
+const diag = { delegate: null, frames: 0, fps: 0, hands: 0, error: "" }; // số liệu chẩn đoán (hiện khi ?debug)
+let diagEl = null;
 let session = null;           // Promise<token | null> của ván đang chơi, dùng để nộp điểm
 // Random
 let meter = 0;                // Lửa (%)
@@ -568,20 +571,51 @@ function fitCamera() {
 }
 video.addEventListener("resize", fitCamera);
 
+const landmarkerOptions = (delegate) => ({
+  baseOptions: { modelAssetPath: MODEL_URL, delegate },
+  runningMode: "VIDEO",
+  numHands: 2,
+  minHandDetectionConfidence: 0.5,
+  minHandPresenceConfidence: 0.4,
+  minTrackingConfidence: 0.3,
+});
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
 async function createLandmarker() {
   const fileset = await FilesetResolver.forVisionTasks(WASM_URL);
-  const opts = (delegate) => ({
-    baseOptions: { modelAssetPath: MODEL_URL, delegate },
-    runningMode: "VIDEO",
-    numHands: 2,
-    minHandDetectionConfidence: 0.5,
-    minHandPresenceConfidence: 0.4,
-    minTrackingConfidence: 0.3,
-  });
+  // GPU nhanh hơn nhưng trên iPhone/iPad (WebKit) tạo được mà không nhận ra tay nào, nên dùng CPU.
+  // Máy khác thử GPU trước, lỗi thì CPU. ?delegate=CPU|GPU để ép một loại khi cần chẩn đoán.
+  const forced = new URLSearchParams(location.search).get("delegate")?.toUpperCase();
+  const order = forced === "CPU" || forced === "GPU" ? [forced] : IS_IOS ? ["CPU"] : ["GPU", "CPU"];
+  let lastErr;
+  for (const d of order) {
+    try {
+      const lm = await HandLandmarker.createFromOptions(fileset, landmarkerOptions(d));
+      diag.delegate = d;
+      return lm;
+    } catch (err) {
+      lastErr = err;
+      diag.error = `${d}: ${err.message || err}`;
+    }
+  }
+  throw lastErr;
+}
+
+// GPU lỗi lúc chạy (mất WebGL context…) thì chuyển hẳn sang CPU
+let fallingBack = false;
+async function fallbackToCpu() {
+  if (fallingBack || diag.delegate !== "GPU") return;
+  fallingBack = true;
+  const old = landmarker;
+  landmarker = null;
   try {
-    return await HandLandmarker.createFromOptions(fileset, opts("GPU"));
-  } catch {
-    return await HandLandmarker.createFromOptions(fileset, opts("CPU"));
+    const fileset = await FilesetResolver.forVisionTasks(WASM_URL);
+    landmarker = await HandLandmarker.createFromOptions(fileset, landmarkerOptions("CPU"));
+    diag.delegate = "CPU";
+    old.close();
+  } catch (err) {
+    console.error(err);
+    landmarker = old;
   }
 }
 
@@ -1171,9 +1205,31 @@ function loop() {
   requestAnimationFrame(loop);
   const now = performance.now();
 
-  if (input === "camera" && landmarker && video.readyState >= 2 && video.currentTime !== lastVideoTime) {
+  // Bỏ qua khung trùng; vài trình duyệt di động không tăng currentTime của luồng camera nên vẫn chạy mỗi ~33ms
+  if (input === "camera" && landmarker && video.readyState >= 2 &&
+      (video.currentTime !== lastVideoTime || now - lastDetectAt > 33)) {
     lastVideoTime = video.currentTime;
-    processFrame(landmarker.detectForVideo(video, now), now);
+    lastDetectAt = now;
+    let res = null;
+    try {
+      res = landmarker.detectForVideo(video, now);
+    } catch (err) {
+      console.error(err);
+      diag.error = String(err.message || err);
+      fallbackToCpu();
+    }
+    if (res) {
+      diag.frames++;
+      diag.hands = res.landmarks?.length || 0;
+      processFrame(res, now);
+    }
+  }
+  if (diagEl && now - (diagEl.lastAt || 0) > 1000) {
+    diag.fps = Math.round((diag.frames * 1000) / (now - (diagEl.lastAt || now - 1000)));
+    diag.frames = 0;
+    diagEl.lastAt = now;
+    diagEl.textContent = `${diag.delegate || "-"} · video ${video.videoWidth}x${video.videoHeight} · ${diag.fps} fps · hands ${diag.hands}`
+      + (diag.error ? `\n${diag.error}` : "");
   }
 
   // Random: Lửa cạn dần, trụ đổi chỗ
@@ -1240,7 +1296,9 @@ if (params.has("debug")) {
     get onRod() { return tracks.map((x) => x.onRod); },
     get meter() { return meter; },
     get rods() { return rodsCaught; },
+    diag,
   };
+  diagEl = document.body.appendChild(Object.assign(document.createElement("pre"), { className: "diag" }));
   if (params.get("lang")) lang = params.get("lang");
   if (params.get("mode")) mode = params.get("mode");
   const auto = params.get("auto");

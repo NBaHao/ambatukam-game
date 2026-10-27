@@ -250,6 +250,13 @@ h2 { margin: 0; font-size: 24px; font-weight: 800; }
 .board li.me { background: var(--fg); color: var(--bg); }
 .board li.me .rk, .board li.me .ct { color: var(--bg); }
 .board li.note { display: block; color: var(--mute); text-align: center; padding: 24px 8px; border: 0; }
+/* Dòng chẩn đoán khi mở ?debug */
+.diag {
+  position: fixed; left: 8px; bottom: 8px; z-index: 50; margin: 0; pointer-events: none;
+  font: 11px/1.4 var(--mono); color: var(--fg); background: rgba(0, 0, 0, .8);
+  padding: 4px 8px; border-radius: 4px; white-space: pre-wrap; max-width: calc(100vw - 16px);
+}
+
 
 @media (max-width: 640px) {
   :root { --cam-aspect: 0.75; --chrome: 124px; }
