@@ -13,3 +13,8 @@ LICENSE
 .DS_Store
 _debug
 *.log
+# Công cụ tạo ảnh (không cần phục vụ)
+package.json
+package-lock.json
+scripts
+brand

@@ -19,7 +19,8 @@ const TOP_N = 50;
 // Random: Lửa bắt đầu 100%, cạn (10 + 0.4·t)%/giây, mỗi nhát nạp 5%
 const RND_START = 100, RND_DRAIN = 10, RND_RAMP = 0.4, RND_GAIN = 5;
 
-const ALLOWED_ORIGINS = [/^https:\/\/nbahao\.github\.io$/, /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/];
+// Game và API cùng tên miền nên không cần CORS; chỉ mở cho trang chạy local ở cổng khác
+const ALLOWED_ORIGINS = [/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/];
 
 export default {
   async fetch(req, env) {
