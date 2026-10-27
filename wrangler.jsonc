@@ -1,0 +1,22 @@
+// Một Worker phục vụ cả game (file tĩnh ở thư mục gốc) lẫn API leaderboard (/api/*).
+// File tĩnh khớp đường dẫn thì trả thẳng, còn lại mới chạy vào worker/src/index.js.
+{
+  "name": "ambatukam",
+  "main": "worker/src/index.js",
+  "compatibility_date": "2026-10-01",
+  "assets": { "directory": "." }, // bỏ qua những file liệt kê trong .assetsignore
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "ambatukam-leaderboard",
+      "database_id": "2a050a93-08f2-4d52-b193-e340203002ca"
+    }
+  ],
+  // Giới hạn số request theo IP (period chỉ được 10 hoặc 60 giây)
+  "ratelimits": [
+    { "name": "SESSION_LIMIT", "namespace_id": "1001", "simple": { "limit": 30, "period": 60 } },
+    { "name": "SCORE_LIMIT", "namespace_id": "1002", "simple": { "limit": 10, "period": 60 } }
+  ]
+  // Secret: TOKEN_SECRET (khoá ký token phiên chơi). Đặt bằng `npx wrangler secret put TOKEN_SECRET`,
+  // chạy local thì để trong .dev.vars
+}

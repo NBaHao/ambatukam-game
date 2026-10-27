@@ -44,7 +44,10 @@
           <button data-d="30">30s</button>
         </div>
         <button id="btn-start" class="btn primary" data-i18n="start"></button>
-        <button id="btn-keyboard" class="link" data-i18n="keyboard"></button>
+        <div class="row links">
+          <button id="btn-keyboard" class="link" data-i18n="keyboard"></button>
+          <button id="btn-board-start" class="link" data-i18n="board"></button>
+        </div>
         <p class="best" id="best-line"></p>
         <p class="fine" data-i18n="fine"></p>
       </div>
@@ -83,11 +86,39 @@
         </dl>
         <canvas id="res-chart" width="560" height="110"></canvas>
         <p class="best" id="res-best"></p>
+        <!-- Gửi điểm lên bảng xếp hạng -->
+        <div class="submit">
+          <form id="submit-form" class="submit-form hidden">
+            <input id="name-input" maxlength="20" autocomplete="nickname" spellcheck="false" />
+            <button class="btn" data-i18n="submit"></button>
+          </form>
+          <p class="best" id="submit-msg"></p>
+          <button id="btn-rename" class="link hidden" data-i18n="rename"></button>
+        </div>
         <div class="row">
           <button id="btn-again" class="btn primary" data-i18n="again"></button>
           <button id="btn-share" class="btn" data-i18n="share"></button>
+          <button id="btn-board-result" class="link" data-i18n="board"></button>
           <button id="btn-home" class="link" data-i18n="home"></button>
         </div>
+      </div>
+
+      <!-- Bảng xếp hạng -->
+      <div id="screen-board" class="screen hidden">
+        <h2 data-i18n="board"></h2>
+        <div class="seg" id="board-modes">
+          <button data-mode="single" data-i18n="modeSingle"></button>
+          <button data-mode="double" data-i18n="modeDouble"></button>
+          <button data-mode="random" data-i18n="modeRandom"></button>
+        </div>
+        <div class="seg" id="board-durations">
+          <button data-d="10">10s</button>
+          <button data-d="20">20s</button>
+          <button data-d="30">30s</button>
+        </div>
+        <ol class="board" id="board-list"></ol>
+        <p class="best" id="board-msg"></p>
+        <button id="btn-board-back" class="btn" data-i18n="back"></button>
       </div>
     </section>
 

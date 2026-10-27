@@ -10,6 +10,8 @@ import { FilesetResolver, HandLandmarker } from "https://cdn.jsdelivr.net/npm/@m
 
 const WASM_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
 const MODEL_URL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
+// API leaderboard chạy cùng Worker với trang game (xem worker/src/index.js)
+const API_URL = "";
 
 // ---------- Tham số tinh chỉnh ----------
 const MAX_RATE = 6;           // nhát/giây ứng với thanh lực đầy
@@ -105,6 +107,22 @@ const STRINGS = {
     share: "Lưu ảnh",
     home: "Đổi chế độ",
     chartLabel: "nhát mỗi giây",
+    board: "Bảng xếp hạng",
+    back: "Quay lại",
+    namePh: "Tên trên bảng xếp hạng",
+    submit: "Gửi điểm",
+    rename: "Đổi tên",
+    submitting: "Đang gửi điểm…",
+    rankLine: (name, r, n) => `${name} · hạng #${r} / ${n}`,
+    submitErr: "Không gửi được điểm. Thử lại nhé",
+    submitRejected: "Điểm không hợp lệ nên không được xếp hạng",
+    noRankKb: "Chơi bằng phím không được xếp hạng",
+    noRankZero: "Chưa có điểm để xếp hạng",
+    boardLoading: "Đang tải…",
+    boardEmpty: "Chưa có ai. Làm người đầu tiên!",
+    boardErr: "Không tải được bảng xếp hạng",
+    boardMe: (r, n, s) => `Bạn đang hạng #${r} / ${n} · ${s}`,
+    strokesN: (n) => `${n} nhát`,
     shareText: (r) => `Tôi đạt ${r} nhát/s trong Ambatukam Game`,
     shareTextRandom: (s) => `Tôi sống sót ${s}s trong Ambatukam Random`,
     shareSub: (n, d, p) => `${n} nhát trong ${d}s · đỉnh ${p}/s`,
@@ -175,6 +193,22 @@ const STRINGS = {
     share: "Save image",
     home: "Change mode",
     chartLabel: "strokes per second",
+    board: "Leaderboard",
+    back: "Back",
+    namePh: "Name on the leaderboard",
+    submit: "Submit",
+    rename: "Change name",
+    submitting: "Submitting score…",
+    rankLine: (name, r, n) => `${name} · rank #${r} of ${n}`,
+    submitErr: "Couldn't submit your score. Try again",
+    submitRejected: "Score rejected, not ranked",
+    noRankKb: "Keyboard runs aren't ranked",
+    noRankZero: "No score to rank yet",
+    boardLoading: "Loading…",
+    boardEmpty: "Nobody yet. Be the first!",
+    boardErr: "Couldn't load the leaderboard",
+    boardMe: (r, n, s) => `You're #${r} of ${n} · ${s}`,
+    strokesN: (n) => `${n} strokes`,
     shareText: (r) => `I hit ${r} strokes/s in Ambatukam Game`,
     shareTextRandom: (s) => `I survived ${s}s in Ambatukam Random`,
     shareSub: (n, d, p) => `${n} strokes in ${d}s · peak ${p}/s`,
@@ -330,13 +364,14 @@ const screens = {
   anchor: $("screen-ready"),
   countdown: $("screen-countdown"),
   result: $("screen-result"),
+  board: $("screen-board"),
 };
 const hud = $("hud");
 
 // ---------- State ----------
 let mode = localStorage.getItem("ambatukam_mode") || "single"; // single | double | random
 let duration = 20;
-let state = "start";          // start | ready | anchor | countdown | playing | result
+let state = "start";          // start | ready | anchor | countdown | playing | result | board
 let input = null;             // "camera" | "keyboard"
 let landmarker = null;
 let lastVideoTime = -1;
@@ -349,6 +384,7 @@ let displayRate = 0;
 let framesOnRod = 0;
 let framesTotal = 0;
 let lastResult = null;        // để vẽ lại màn kết quả khi đổi ngôn ngữ
+let session = null;           // Promise<token | null> của ván đang chơi, dùng để nộp điểm
 // Random
 let meter = 0;                // Lửa (%)
 let rodSpawnAt = 0;
@@ -391,7 +427,8 @@ function applyLang() {
   for (const b of $("lang").children) b.classList.toggle("active", b.dataset.lang === lang);
   renderModeTexts();
   if (input === "keyboard" && state === "ready") $("ready-hint").innerHTML = t("kbHint");
-  if (state === "result" && lastResult) renderResult();
+  if (lastResult && (state === "result" || state === "board")) renderResult();
+  if (state === "board") renderBoard();
 }
 
 function renderModeTexts() {
@@ -641,7 +678,9 @@ function processFrame(res, now) {
 
   let progress = 0;
   if (state === "ready" || state === "result") {
-    progress = palmHold.update(anyOpen, now);
+    // Đang gõ tên thì không cho xòe tay kích hoạt chơi lại
+    const typing = document.activeElement?.tagName === "INPUT";
+    progress = palmHold.update(anyOpen && !typing, now);
     const openHand = hands.find((h) => h && h.open);
     if (openHand) refSize = openHand.size;
     setGesture(t(state === "ready" ? "gPalmReady" : "gPalmReplay"), progress);
@@ -801,7 +840,7 @@ function keyboardSample(y) {
   if (rev === "bottom") onStroke(tr, now);
 }
 window.addEventListener("keydown", (e) => {
-  if (input !== "keyboard" || !(e.code in KEY_Y)) return;
+  if (input !== "keyboard" || !(e.code in KEY_Y) || e.target.tagName === "INPUT") return;
   e.preventDefault();
   if (e.repeat) return;
   keyboardSample(KEY_Y[e.code]);
@@ -842,6 +881,7 @@ function startPlaying() {
   rodHasStroke = false;
   playStart = performance.now();
   lastTick = playStart;
+  session = input === "camera" ? requestSession() : null;
   if (mode === "random") rodSpawnAt = playStart;
   $("hud-count").textContent = "0";
   $("hud-split").textContent = mode === "double" ? "0 + 0" : "";
@@ -878,8 +918,13 @@ function finish() {
   r.count = count; r.duration = duration; r.bins = [...bins]; r.peak = Math.max(0, ...bins);
   r.rods = rodsCaught; r.prevBest = prev; r.mode = mode;
   if (r.score > prev) localStorage.setItem(bestKey(), String(r.score));
+  r.session = session;
+  r.submit = input !== "camera" ? { status: "off", msg: "noRankKb" } : r.score > 0 ? { status: "form" } : { status: "off", msg: "noRankZero" };
+  $("name-input").value = localStorage.getItem("ambatukam_name") || "";
   lastResult = r;
   renderResult();
+  // Đã có tên từ lần trước thì tự gửi luôn
+  if (r.submit.status === "form" && $("name-input").value) submitScore();
   if (r.tier >= 3) say("Ambatukam!");
 }
 
@@ -906,6 +951,7 @@ function renderResult() {
     ? (r.prevBest ? t("newBest", r.prevBest) : t("firstBest"))
     : (isTimed() ? t("bestShort", r.prevBest, r.duration) : t("bestShortRandom", r.prevBest));
   drawChart($("res-chart"), r.bins, r.peak);
+  renderSubmit();
 }
 
 function drawChart(canvas, data, peak) {
@@ -931,6 +977,145 @@ function drawChart(canvas, data, peak) {
   ctx.fillText(`${n}s`, w - pad, h - 3);
   ctx.textAlign = "left";
 }
+
+// ---------- Bảng xếp hạng ----------
+async function api(path, body) {
+  const res = await fetch(API_URL + path, body && {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || String(res.status));
+  return data;
+}
+
+// Mã người chơi ẩn danh: mỗi máy giữ một dòng điểm cao nhất trên bảng
+function playerId() {
+  let id = localStorage.getItem("ambatukam_pid");
+  if (!id) { id = crypto.randomUUID(); localStorage.setItem("ambatukam_pid", id); }
+  return id;
+}
+
+// Server ghi lại lúc bắt đầu ván để đối chiếu thời lượng khi nộp điểm
+function requestSession() {
+  return api("/api/session", { mode, duration: isTimed() ? duration : 0 }).then((d) => d.token, () => null);
+}
+
+async function submitScore() {
+  const r = lastResult;
+  const name = $("name-input").value.trim();
+  if (!name) { $("name-input").focus(); return; }
+  localStorage.setItem("ambatukam_name", name);
+  $("name-input").blur();
+  r.submit = { status: "sending" };
+  renderSubmit();
+  try {
+    const token = await r.session;
+    if (!token) throw new Error("no_session");
+    const res = await api("/api/score", {
+      token, pid: playerId(), name, strokes: r.count,
+      survived: r.mode === "random" ? r.score : undefined,
+    });
+    r.submit = { status: "done", ...res };
+  } catch (err) {
+    r.submit = ["too_fast", "implausible", "bad_score"].includes(err.message)
+      ? { status: "off", msg: "submitRejected" }
+      : { status: "error", msg: "submitErr" };
+  }
+  if (lastResult === r) renderSubmit();
+}
+
+function renderSubmit() {
+  const s = lastResult.submit;
+  $("submit-form").classList.toggle("hidden", s.status !== "form" && s.status !== "error");
+  $("btn-rename").classList.toggle("hidden", s.status !== "done");
+  $("name-input").placeholder = t("namePh");
+  $("submit-msg").textContent =
+    s.status === "sending" ? t("submitting")
+    : s.status === "done" ? t("rankLine", s.name, s.rank, s.total)
+    : s.msg ? t(s.msg) : "";
+}
+
+$("submit-form").addEventListener("submit", (e) => { e.preventDefault(); submitScore(); });
+$("btn-rename").addEventListener("click", () => {
+  lastResult.submit = { status: "form" };
+  renderSubmit();
+  $("name-input").focus();
+  $("name-input").select();
+});
+
+let boardMode = "single";
+let boardDuration = 20;
+let boardBack = "start";      // màn hình quay về khi bấm "Quay lại"
+let boardData = null;         // null = đang tải, "error", hoặc { entries, me }
+let boardReq = 0;             // bỏ qua kết quả của request cũ khi đã đổi tab
+
+function openBoard() {
+  boardBack = state;
+  boardMode = mode;
+  if (isTimed()) boardDuration = duration;
+  show("board");
+  loadBoard();
+}
+
+function loadBoard() {
+  for (const b of $("board-modes").children) b.classList.toggle("active", b.dataset.mode === boardMode);
+  for (const b of $("board-durations").children) b.classList.toggle("active", Number(b.dataset.d) === boardDuration);
+  $("board-durations").classList.toggle("ghost", boardMode === "random");
+  boardData = null;
+  renderBoard();
+  const req = ++boardReq;
+  const d = boardMode === "random" ? 0 : boardDuration;
+  api(`/api/leaderboard?mode=${boardMode}&duration=${d}&pid=${playerId()}`)
+    .catch(() => "error")
+    .then((data) => { if (req === boardReq) { boardData = data; renderBoard(); } });
+}
+
+// Single/double xếp theo tổng nhát nhưng hiển thị nhát/giây; random theo giây sống sót
+function boardScore(score) {
+  return boardMode === "random" ? `${score.toFixed(1)}s` : `${(score / boardDuration).toFixed(2)}/s`;
+}
+
+function renderBoard() {
+  const list = $("board-list");
+  const d = boardData;
+  const row = (cls, cells) => {
+    const li = document.createElement("li");
+    if (cls) li.className = cls;
+    for (const [c, text] of cells) {
+      const span = document.createElement("span");
+      span.className = c;
+      span.textContent = text;
+      li.append(span);
+    }
+    return li;
+  };
+  if (!d || d === "error" || !d.entries.length) {
+    list.replaceChildren(row("note", [["", t(!d ? "boardLoading" : d === "error" ? "boardErr" : "boardEmpty")]]));
+    $("board-msg").textContent = "";
+    return;
+  }
+  list.replaceChildren(...d.entries.map((e, i) =>
+    row(e.me ? "me" : "", [["rk", i + 1], ["nm", e.name], ["sc", boardScore(e.score)], ["ct", t("strokesN", e.strokes)]])));
+  $("board-msg").textContent = d.me && !d.entries.some((e) => e.me) ? t("boardMe", d.me.rank, d.me.total, boardScore(d.me.score)) : "";
+}
+
+$("btn-board-start").addEventListener("click", openBoard);
+$("btn-board-result").addEventListener("click", openBoard);
+$("btn-board-back").addEventListener("click", () => show(boardBack));
+$("board-modes").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  boardMode = b.dataset.mode;
+  loadBoard();
+});
+$("board-durations").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  boardDuration = Number(b.dataset.d);
+  loadBoard();
+});
 
 // ---------- Chia sẻ ----------
 async function shareResult() {

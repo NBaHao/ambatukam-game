@@ -1,0 +1,20 @@
+# Kiểm tra nhanh trên mỗi PR / push. Deploy do Cloudflare Workers Builds lo (nối repo trên dashboard).
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Kiểm tra cú pháp JS
+        run: node --check game.js && node --check worker/src/index.js
+      - name: Kiểm tra cấu hình Worker và đóng gói thử (không deploy)
+        run: npx --yes wrangler@4 deploy --dry-run --outdir /tmp/dist

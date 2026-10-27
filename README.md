@@ -2,11 +2,11 @@
 
 Game meme chơi bằng webcam: nắm tay như cầm một thanh trụ, xóc lên xuống thật nhanh. Có ba chế độ: đo tốc độ một tay, hai tay, và sống sót đuổi theo trụ ngẫu nhiên.
 
-Toàn bộ nhận diện tay chạy trong trình duyệt. Không có backend, video không rời khỏi máy người chơi.
+Toàn bộ nhận diện tay chạy trong trình duyệt, video không rời khỏi máy người chơi. Backend duy nhất là bảng xếp hạng (Cloudflare Workers + D1), chỉ nhận tên và điểm.
 
 > Game giải trí lành mạnh cho 16+. Không có hình ảnh nhạy cảm. Mục đích: vui, theo trend, và vận động cơ tay.
 
-**Chơi ngay:** https://nbahao.github.io/ambatukam-game/
+**Chơi ngay:** https://ambatukam.ambatukam-game.workers.dev
 
 ![Màn hình bắt đầu](docs/start.png)
 
@@ -26,6 +26,28 @@ Cách khác nếu đã có Node: `npx serve .`
 
 Khi đưa lên mạng phải dùng HTTPS (GitHub Pages, Vercel, Netlify… đều được), vì trình duyệt chỉ cho mở camera trên `localhost` hoặc HTTPS.
 
+### Chạy kèm bảng xếp hạng
+
+Game và API bảng xếp hạng chạy chung một Cloudflare Worker (file tĩnh + `/api/*`). Cần Node:
+
+```bash
+echo "TOKEN_SECRET=dev" > .dev.vars                                                   # khoá ký token khi chạy local
+npx wrangler d1 execute ambatukam-leaderboard --local --file worker/schema.sql        # tạo bảng (lần đầu)
+npx wrangler dev                                                                      # http://localhost:8787
+```
+
+Deploy:
+
+```bash
+npx wrangler login
+npx wrangler d1 create ambatukam-leaderboard          # lần đầu; dán database_id vào wrangler.jsonc
+npx wrangler d1 execute ambatukam-leaderboard --remote --file worker/schema.sql
+openssl rand -hex 32 | npx wrangler secret put TOKEN_SECRET
+npx wrangler deploy
+```
+
+Toàn bộ nằm trong free tier của Cloudflare (Workers 100k request/ngày, D1 5 GB).
+
 ## Chế độ
 
 | Chế độ | Cách chơi | Điểm |
@@ -36,6 +58,24 @@ Khi đưa lên mạng phải dùng HTTPS (GitHub Pages, Vercel, Netlify… đề
 | Rank, PvP | Sắp có | |
 
 Kỷ lục lưu riêng cho từng chế độ (và từng mốc thời gian) trong `localStorage`.
+
+## Bảng xếp hạng
+
+Chơi bằng camera xong, nhập tên ở màn kết quả để gửi điểm. Lần sau game nhớ tên và tự gửi. Mỗi máy giữ một dòng điểm cao nhất cho mỗi chế độ và mốc thời gian (định danh bằng mã ngẫu nhiên trong `localStorage`, không cần đăng nhập). Chơi bằng phím không được xếp hạng.
+
+Điểm tính ở trình duyệt nên không chặn gian lận tuyệt đối được, server chỉ làm khó hơn:
+
+- Lúc bắt đầu ván, server cấp token ký HMAC ghi lại thời điểm. Nộp điểm sớm hơn thời lượng ván (hoặc số giây sống sót) là bị từ chối.
+- Single/double: tối đa 12 nhát/giây mỗi tay. Random: tối đa 300 giây, và số nhát phải đủ bù lượng Lửa đã cạn.
+- Giới hạn số request theo IP.
+
+API (`worker/src/index.js`):
+
+| Endpoint | Việc |
+|---|---|
+| `POST /api/session` `{ mode, duration }` | Cấp token cho ván mới |
+| `POST /api/score` `{ token, pid, name, strokes, survived? }` | Nộp điểm, trả về hạng hiện tại |
+| `GET /api/leaderboard?mode=&duration=&pid=` | Top 50 và hạng của người chơi |
 
 ## Cách chơi
 
@@ -75,10 +115,14 @@ Tất cả tham số nằm ở đầu `game.js`, có chú thích từng dòng.
 ## Cấu trúc
 
 ```
-index.html   Khung trang + các màn hình (start / ready / countdown / HUD / result)
-style.css    Giao diện: đen trắng, một màu nhấn, không gradient
-game.js      Toàn bộ logic: i18n, nhận diện tay, đếm nhát, vẽ overlay, chia sẻ
-docs/        Ảnh chụp màn hình
+index.html         Khung trang + các màn hình (start / ready / countdown / HUD / result / board)
+style.css          Giao diện: đen trắng, một màu nhấn, không gradient
+game.js            Toàn bộ logic: i18n, nhận diện tay, đếm nhát, vẽ overlay, chia sẻ, bảng xếp hạng
+worker/src/        API bảng xếp hạng (Cloudflare Worker)
+worker/schema.sql  Bảng D1
+wrangler.jsonc     Cấu hình Worker: phục vụ file tĩnh + /api/*
+.assetsignore      File không được phục vụ ra ngoài
+docs/              Ảnh chụp màn hình
 ```
 
 Không có bước build. Thư viện MediaPipe và mô hình tải từ CDN lúc chạy.
@@ -98,7 +142,7 @@ Nhảy thẳng tới một màn hình để xem giao diện, thêm `mode=single|
 
 ## Ý tưởng tiếp theo
 
-- Rank: bảng xếp hạng toàn cầu (cần backend nhỏ + chống gian lận bằng chuỗi thời điểm từng nhát)
+- Rank: chống gian lận chặt hơn bằng chuỗi thời điểm từng nhát
 - PvP: 1v1 qua WebRTC
 - Rhythm: xóc theo nhịp nhạc
 
@@ -112,11 +156,13 @@ MIT
 
 Webcam meme game: grip like you're holding a rod, stroke up and down as fast as you can. Three modes: **Single** (1 hand, timed, average strokes/sec), **Double** (2 hands, 2 rods, strokes add up), **Random** (the rod spawns at random spots and keeps relocating; chase it to keep your Heat meter up, survive as long as you can). Rank and PvP are coming soon.
 
-Hand tracking runs entirely in the browser. No backend; video never leaves the device. For fun, 16+, no explicit imagery.
+Hand tracking runs entirely in the browser; video never leaves the device. The only backend is the leaderboard (Cloudflare Workers + D1), which receives just a name and a score. For fun, 16+, no explicit imagery.
 
-**Play online:** https://nbahao.github.io/ambatukam-game/
+**Play online:** https://ambatukam.ambatukam-game.workers.dev
 
-**Run locally:** any static server works, e.g. `python3 -m http.server 5173`, then open http://localhost:5173. Camera access requires `localhost` or HTTPS.
+**Run locally:** any static server works, e.g. `python3 -m http.server 5173`, then open http://localhost:5173. Camera access requires `localhost` or HTTPS. For the leaderboard, run the game and API together with `npx wrangler dev` (see the Vietnamese section above for setup and deploy).
+
+**Leaderboard:** after a camera run, enter a name on the result screen to submit. One best score per device per mode/duration. Keyboard runs aren't ranked. The server signs a session token at the start of each run and rejects scores submitted faster than the run could take or beyond human limits.
 
 **Play:** pick a mode and duration → open palm 1s to get ready → grip and hold still 1s to set the anchor (both hands in Double; skipped in Random) → stroke along the virtual rod. Only strokes made while gripping inside the rod zone count. Open palm again to replay. Keyboard mode (`↑` `↓`) is available without a camera.
 
