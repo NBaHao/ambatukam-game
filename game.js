@@ -61,6 +61,7 @@ const STRINGS = {
     subRandom: "Trụ xuất hiện ngẫu nhiên và liên tục đổi chỗ. Đuổi theo mà xóc để giữ Lửa. Lửa cạn là thua, sống càng lâu càng tốt.",
     start: "Bật camera & chơi",
     keyboard: "Không có camera? Chơi bằng phím ↑ ↓",
+    keyboardTouch: "Không có camera? Chơi bằng cách chạm",
     fine: "Game meme giải trí, 16+. Không có hình ảnh nhạy cảm. Video không rời khỏi máy bạn.",
     bestLine: (n, d) => `Kỷ lục ${d}s: ${n} nhát · ${(n / d).toFixed(2)} nhát/s`,
     bestLineRandom: (s) => `Kỷ lục: sống sót ${s.toFixed(1)}s`,
@@ -147,6 +148,7 @@ const STRINGS = {
     subRandom: "The rod spawns at random and keeps relocating. Chase it and stroke to keep your Heat up. Heat hits zero, game over. Survive as long as you can.",
     start: "Turn on camera & play",
     keyboard: "No camera? Play with ↑ ↓ keys",
+    keyboardTouch: "No camera? Play by tapping",
     fine: "Meme game for fun, 16+. No explicit imagery. Video never leaves your device.",
     bestLine: (n, d) => `Best ${d}s: ${n} strokes · ${(n / d).toFixed(2)}/s`,
     bestLineRandom: (s) => `Best: survived ${s.toFixed(1)}s`,
@@ -554,9 +556,17 @@ async function startCamera() {
   });
   video.srcObject = stream;
   await video.play();
+  fitCamera();
+}
+
+// Khung hình theo đúng tỉ lệ video (điện thoại cầm dọc trả về video dọc), cập nhật khi xoay máy
+function fitCamera() {
+  if (!video.videoWidth) return;
   overlay.width = video.videoWidth;
   overlay.height = video.videoHeight;
+  document.documentElement.style.setProperty("--cam-aspect", String(video.videoWidth / video.videoHeight));
 }
+video.addEventListener("resize", fitCamera);
 
 async function createLandmarker() {
   const fileset = await FilesetResolver.forVisionTasks(WASM_URL);
@@ -1268,5 +1278,7 @@ if (params.has("debug")) {
   }
 }
 
+// Màn cảm ứng: chế độ không camera chơi bằng cách chạm nửa trên / nửa dưới
+if (matchMedia("(pointer: coarse)").matches) $("btn-keyboard").dataset.i18n = "keyboardTouch";
 applyLang();
 requestAnimationFrame(loop);
