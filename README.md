@@ -6,7 +6,7 @@ Toàn bộ nhận diện tay chạy trong trình duyệt, video không rời kh�
 
 > Game giải trí lành mạnh cho 16+. Không có hình ảnh nhạy cảm. Mục đích: vui, theo trend, và vận động cơ tay.
 
-**Chơi ngay:** https://ambatukam.ambatukam-game.workers.dev
+**Chơi ngay:** https://ambatukam.bahao.site
 
 ![Màn hình bắt đầu](docs/start.png)
 
@@ -158,7 +158,7 @@ Webcam meme game: grip like you're holding a rod, stroke up and down as fast as 
 
 Hand tracking runs entirely in the browser; video never leaves the device. The only backend is the leaderboard (Cloudflare Workers + D1), which receives just a name and a score. For fun, 16+, no explicit imagery.
 
-**Play online:** https://ambatukam.ambatukam-game.workers.dev
+**Play online:** https://ambatukam.bahao.site
 
 **Run locally:** any static server works, e.g. `python3 -m http.server 5173`, then open http://localhost:5173. Camera access requires `localhost` or HTTPS. For the leaderboard, run the game and API together with `npx wrangler dev` (see the Vietnamese section above for setup and deploy).
 

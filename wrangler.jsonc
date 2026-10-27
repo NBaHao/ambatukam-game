@@ -5,6 +5,9 @@
   "main": "worker/src/index.js",
   "compatibility_date": "2026-10-01",
   "assets": { "directory": "." }, // bỏ qua những file liệt kê trong .assetsignore
+  // Tên miền riêng: Cloudflare tự tạo bản ghi DNS + chứng chỉ SSL khi deploy (zone bahao.site nằm trên Cloudflare).
+  // Link workers.dev vẫn chạy song song.
+  "routes": [{ "pattern": "ambatukam.bahao.site", "custom_domain": true }],
   "d1_databases": [
     {
       "binding": "DB",
