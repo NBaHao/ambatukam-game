@@ -23,7 +23,11 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
-      - run: npm run build
+      # Không có file env trong repo: CI build bằng khoá thử Turnstile ở mode "ci"
+      # (mode production từ chối khoá thử, xem vite.config.ts)
+      - run: npm run build -- --mode ci
+        env:
+          VITE_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
       - uses: actions/upload-artifact@v4
         with:
           name: frontend-dist

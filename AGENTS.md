@@ -41,15 +41,19 @@ Engine chỉ phát ra **khoá chuỗi** (`gPalmReady`, `sLost`…), React dịch
 
 ## Biến môi trường và secret
 
-**Frontend (Vite, build-time, CÔNG KHAI).** Mọi biến `VITE_*` bị nhúng vào bundle JS, ai cũng đọc được.
+**Quy tắc: không commit file env nào.** Mọi `.env*`, `.dev.vars*`, `*.local` đều gitignore; chỉ commit file mẫu `*.example`.
 
-| Biến | Ở đâu | Ghi chú |
-|---|---|---|
-| `VITE_TURNSTILE_SITE_KEY` | `frontend/.env.development` (khoá thử), `frontend/.env.production` (khoá thật) | Bắt buộc. Thiếu thì trang báo lỗi ngay (`src/config.ts`) |
-| `VITE_API_BASE_URL` | để trống | Trống = cùng tên miền. Dev dùng proxy của Vite |
+**Frontend (Vite, build-time, CÔNG KHAI).** Mọi biến `VITE_*` bị nhúng vào bundle JS, ai cũng đọc được: không bao giờ đặt secret vào biến `VITE_*`.
 
-`.env.development` / `.env.production` được commit vì chỉ chứa giá trị công khai. Ghi đè trên máy mình bằng `*.local` (đã gitignore). Mẫu và giải thích ở `frontend/.env.example`.
-Khi thêm biến mới: thêm vào `.env.example`, khai báo kiểu trong `src/vite-env.d.ts`, đọc qua `src/config.ts` (không gọi `import.meta.env` rải rác).
+| Biến | Local | Production | CI |
+|---|---|---|---|
+| `VITE_TURNSTILE_SITE_KEY` | `frontend/.env.development` (khoá thử, copy từ `.env.example`) | Cloudflare → Workers → ambatukam → Settings → Build → **Variables and secrets** | khoá thử, `--mode ci` (`ci.yml`) |
+| `VITE_API_BASE_URL` | để trống | không đặt (= cùng tên miền) | không đặt |
+| `API_DEV_URL` | tuỳ chọn, chỉ cho proxy của `vite dev` | | |
+
+`vite.config.ts` kiểm tra lúc build: thiếu `VITE_TURNSTILE_SITE_KEY`, hoặc build production bằng khoá thử, là build lỗi ngay (không deploy ra trang hỏng).
+Deploy tay từ máy mình (`make deploy`) thì tạo `frontend/.env.production` (gitignore) chứa sitekey thật.
+Khi thêm biến mới: thêm vào `.env.example`, khai báo kiểu trong `src/vite-env.d.ts`, đọc qua `src/config.ts` (không gọi `import.meta.env` rải rác), thêm vào Build variables trên Cloudflare nếu production cần.
 
 **Backend (secret của Worker, KHÔNG BAO GIỜ commit).**
 
@@ -58,7 +62,7 @@ Khi thêm biến mới: thêm vào `.env.example`, khai báo kiểu trong `src/v
 | `TOKEN_SECRET` | `cd backend && openssl rand -hex 32 \| uv run pywrangler secret put TOKEN_SECRET` | `backend/.dev.vars` |
 | `TURNSTILE_SECRET` | `cd backend && uv run pywrangler secret put TURNSTILE_SECRET` (Cloudflare dashboard → Turnstile → widget) | `backend/.dev.vars` (khoá thử `1x0000000000000000000000000000000AA`) |
 
-`backend/.dev.vars` đã gitignore; tạo từ `backend/.dev.vars.example`. Đọc secret qua `Settings.from_env` (`src/app/config.py`), thiếu thì lỗi 500 rõ ràng.
+`backend/.dev.vars` đã gitignore; `make install` tạo từ `backend/.dev.vars.example`. Đọc secret qua `Settings.from_env` (`src/app/config.py`), thiếu thì lỗi 500 rõ ràng.
 Không in secret ra log, không dán vào issue/PR.
 
 Khoá Turnstile thử của Cloudflare (luôn qua): sitekey `1x00000000000000000000AA`, secret `1x0000000000000000000000000000000AA`.
@@ -69,14 +73,13 @@ Sitekey thật và secret thật phải cùng một widget, và widget phải ch
 Cần Node 22+ và [uv](https://docs.astral.sh/uv/) ≥ 0.13.4 (pywrangler đòi bản này).
 
 ```bash
-make install                       # npm ci (frontend) + uv sync (backend)
-cp backend/.dev.vars.example backend/.dev.vars
+make install                       # npm ci + uv sync + copy file env mẫu (frontend/.env.development, backend/.dev.vars)
 make migrate-local                 # tạo bảng trong D1 local (lần đầu, hoặc khi có migration mới)
 make dev-api                       # Worker thật trên http://localhost:8787 (API + dist)
 make dev-web                       # Vite trên http://localhost:5173, /api proxy sang 8787
 ```
 
-API chạy port khác thì đặt `API_DEV_URL=http://localhost:8788` trong `frontend/.env.development.local` (hoặc `API_DEV_URL=… make dev-web`). Tài liệu API: http://localhost:8787/api/docs.
+API chạy port khác thì đặt `API_DEV_URL=http://localhost:8788` trong `frontend/.env.development` (hoặc `API_DEV_URL=… make dev-web`). Tài liệu API: http://localhost:8787/api/docs.
 
 Trước khi commit: `make lint test build` phải xanh.
 
@@ -115,7 +118,10 @@ Workers Builds (Cloudflare dashboard → Workers → ambatukam → Settings → 
 |---|---|
 | Root directory | `/` |
 | Build command | `npm ci --prefix frontend && npm run build --prefix frontend` |
+| Build variables | `VITE_TURNSTILE_SITE_KEY` = sitekey thật của widget Turnstile |
 | Deploy command | `cd backend && uv run pywrangler d1 migrations apply ambatukam-leaderboard --remote && uv run pywrangler deploy` |
+
+Worker secrets (`TOKEN_SECRET`, `TURNSTILE_SECRET`) nằm ở Settings → Variables and secrets (runtime), khác với Build variables ở trên.
 
 GitHub Actions (`.github/workflows/ci.yml`) chỉ kiểm tra: typecheck, lint, test, build, ruff, pytest, `pywrangler deploy --dry-run`. Không cần GitHub secret nào.
 
@@ -124,6 +130,6 @@ Checklist khi deploy thay đổi lớn:
 1. `make lint test build` xanh.
 2. Có migration mới: `make migrate-remote` (hoặc để deploy command lo). Migration phải chạy lại được an toàn (`IF NOT EXISTS`).
 3. Có secret mới: `uv run pywrangler secret put <NAME>` trong `backend/` trước khi deploy.
-4. Đổi widget Turnstile: cập nhật `frontend/.env.production` và secret `TURNSTILE_SECRET` cùng lúc.
+4. Đổi widget Turnstile: cập nhật Build variable `VITE_TURNSTILE_SITE_KEY` và Worker secret `TURNSTILE_SECRET` cùng lúc.
 5. Bundle Worker (gzip) phải dưới 3 MB của gói free; `pywrangler deploy --dry-run` in ra kích thước.
 6. Sau deploy: mở trang, chơi một ván, gửi điểm, xem bảng xếp hạng.

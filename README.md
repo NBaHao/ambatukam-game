@@ -17,8 +17,7 @@ Frontend React + TypeScript (Vite), backend FastAPI chạy trên Cloudflare Pyth
 ```bash
 git clone https://github.com/NBaHao/ambatukam-game.git
 cd ambatukam-game
-make install                                   # npm ci + uv sync
-cp backend/.dev.vars.example backend/.dev.vars # khoá local (Turnstile: khoá thử, luôn qua)
+make install                                   # npm ci + uv sync + tạo file env local từ *.example (khoá thử)
 make migrate-local                             # tạo bảng D1 local (lần đầu)
 make dev-api                                   # API + Worker: http://localhost:8787
 make dev-web                                   # giao diện: http://localhost:5173 (mở cái này)
@@ -33,7 +32,8 @@ cd backend
 uv run pywrangler login
 uv run pywrangler d1 migrations apply ambatukam-leaderboard --remote
 openssl rand -hex 32 | uv run pywrangler secret put TOKEN_SECRET   # lần đầu
-uv run pywrangler secret put TURNSTILE_SECRET                      # lần đầu; sitekey nằm ở frontend/.env.production
+uv run pywrangler secret put TURNSTILE_SECRET                      # lần đầu
+# sitekey: Build variable VITE_TURNSTILE_SITE_KEY trên Cloudflare (deploy tay: frontend/.env.production, đã gitignore)
 cd .. && make deploy
 ```
 
@@ -157,7 +157,7 @@ Hand tracking runs entirely in the browser; video never leaves the device. The o
 
 **Stack:** React + TypeScript (Vite) in `frontend/`, FastAPI on Cloudflare Python Workers + D1 in `backend/`, served from one Worker.
 
-**Run locally:** needs Node 22+ and uv ≥ 0.13.4. `make install`, copy `backend/.dev.vars.example` to `backend/.dev.vars`, `make migrate-local`, then `make dev-api` and `make dev-web` and open http://localhost:5173. Camera access requires `localhost` or HTTPS. Env vars, secrets, conventions and deploy are documented in [AGENTS.md](AGENTS.md).
+**Run locally:** needs Node 22+ and uv ≥ 0.13.4. `make install` (also creates local env files from the `*.example` templates), `make migrate-local`, then `make dev-api` and `make dev-web` and open http://localhost:5173. Camera access requires `localhost` or HTTPS. Env vars, secrets, conventions and deploy are documented in [AGENTS.md](AGENTS.md).
 
 **Leaderboard:** when a run ends, a result popup shows your score and a name field to submit it, then your rank. One best score per device per mode/duration. Scores are computed in the browser, so the server makes cheating harder rather than impossible: a one-time HMAC session token per run, a submit window, per-second stroke counts checked against the total, the camera frame rate, time spent on the rod and human limits (8 strokes/s per hand on average), a replay of the Heat meter in Random, Cloudflare Turnstile, and per-IP rate limits.
 

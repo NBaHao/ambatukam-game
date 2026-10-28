@@ -13,15 +13,13 @@ Thumbs.db
 *.log
 _debug/
 
-# Secret và cấu hình riêng từng máy: không bao giờ commit (chỉ commit file *.example).
-# frontend/.env.development và .env.production chỉ chứa giá trị công khai nên được commit.
+# Env và secret: KHÔNG commit file env nào, chỉ commit file *.example.
+# Production: frontend lấy biến lúc build từ Cloudflare Build variables, backend lấy secret từ Worker secrets.
 .env
-.env.local
-.env.*.local
+.env.*
 *.local
 .dev.vars
 .dev.vars.*
-backend/.env.*
 !*.example
 
 # Wrangler local state (D1 local, cache)
