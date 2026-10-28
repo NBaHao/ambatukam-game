@@ -28,3 +28,14 @@ export function summarize(run: RunResult, prevBest: number): RunSummary {
 export function formatBoardScore(score: number, mode: RunResult["mode"], duration: number): string {
   return mode === "random" ? `${score.toFixed(1)}s` : `${(score / duration).toFixed(2)}/s`;
 }
+
+/**
+ * Hạng dự kiến của một ván trước khi gửi, dựa trên bảng xếp hạng hiện tại.
+ * Server giữ điểm cao nhất của mỗi người chơi, nên tính theo max(ván này, dòng cũ của mình).
+ * Người khác bằng điểm thì đạt trước nên đứng trên.
+ */
+export function projectedRank(entries: { score: number; me: boolean }[], score: number): number {
+  const mine = entries.find((e) => e.me)?.score ?? 0;
+  const best = Math.max(score, mine);
+  return entries.filter((e) => !e.me && e.score >= best).length + 1;
+}

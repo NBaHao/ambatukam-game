@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RunResult } from "../game/types";
-import { formatBoardScore, summarize, tierIndex } from "./scoring";
+import { formatBoardScore, projectedRank, summarize, tierIndex } from "./scoring";
 
 const run = (over: Partial<RunResult>): RunResult => ({
   mode: "single",
@@ -38,5 +38,16 @@ describe("scoring", () => {
   it("formats board scores", () => {
     expect(formatBoardScore(39, "single", 10)).toBe("3.90/s");
     expect(formatBoardScore(23.4, "random", 0)).toBe("23.4s");
+  });
+
+  it("projects the rank of an unsubmitted run", () => {
+    const board = [50, 40, 30].map((score) => ({ score, me: false }));
+    expect(projectedRank([], 10)).toBe(1);
+    expect(projectedRank(board, 45)).toBe(2);
+    // Bằng điểm thì người đạt trước đứng trên
+    expect(projectedRank(board, 40)).toBe(3);
+    expect(projectedRank(board, 5)).toBe(4);
+    // Dòng cũ của mình cao hơn ván này thì giữ hạng cũ
+    expect(projectedRank([...board, { score: 45, me: true }], 20)).toBe(2);
   });
 });
