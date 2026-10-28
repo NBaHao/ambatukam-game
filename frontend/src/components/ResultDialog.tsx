@@ -46,7 +46,7 @@ export function ResultDialog({ finished, open, replayProgress, onAgain, onClose,
   const { t, strings } = useI18n();
   const { run, summary } = finished;
   const timed = isTimed(run.mode);
-  const [title] = strings.tiers[summary.tier];
+  const title = strings.tiers[summary.tier];
 
   const dialogRef = useRef<HTMLDialogElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);

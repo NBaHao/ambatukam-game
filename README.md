@@ -43,9 +43,9 @@ Toàn bộ nằm trong free tier của Cloudflare (Workers 100k request/ngày, D
 
 | Chế độ | Cách chơi | Điểm |
 |---|---|---|
-| **Single** | 1 tay, 1 trụ. Đặt neo rồi xóc trong 10 / 20 / 30 giây | Nhát/giây trung bình |
-| **Double** | 2 tay, 2 trụ. Cả hai tay cùng nắm và giữ yên để đặt hai neo, rồi xóc cả hai. Nhát hai tay cộng dồn | Nhát/giây trung bình (danh hiệu tính theo mỗi tay) |
-| **Random** | Trụ hiện ở chỗ ngẫu nhiên, nghiêng ngẫu nhiên, và đổi chỗ sau 5 giây (giảm dần tới 2.5 giây). Phải nắm tay đuổi theo rồi xóc. Thanh **Lửa** cạn 10%/giây lúc đầu và cạn nhanh dần; mỗi nhát đúng trụ nạp 5%. Hết Lửa là dừng | Số giây sống sót |
+| **Single** | 1 tay, 1 trụ. Đặt neo rồi xóc trong 10 / 20 / 30 giây | Lọ/giây trung bình |
+| **Double** | 2 tay, 2 trụ. Cả hai tay cùng nắm và giữ yên để đặt hai neo, rồi xóc cả hai. Lọ hai tay cộng dồn | Lọ/giây trung bình (danh hiệu tính theo mỗi tay) |
+| **Random** | Trụ hiện ở chỗ ngẫu nhiên, nghiêng ngẫu nhiên, và đổi chỗ sau 5 giây (giảm dần tới 2.5 giây). Phải nắm tay đuổi theo rồi xóc. Thanh **Lửa** cạn 10%/giây lúc đầu và cạn nhanh dần; mỗi lọ đúng trụ nạp 5%. Hết Lửa là dừng | Số giây sống sót |
 | Rank, PvP | Sắp có | |
 
 Kỷ lục lưu riêng cho từng chế độ (và từng mốc thời gian) trong `localStorage`.
@@ -58,7 +58,7 @@ Hết ván, popup kết quả hiện điểm và ô nhập tên để gửi đi�
 
 - Lúc bắt đầu ván, server cấp token ký HMAC ghi lại thời điểm. Nộp điểm sớm hơn thời lượng ván (hoặc số giây sống sót), hoặc trễ quá 15 phút sau khi hết ván, là bị từ chối.
 - Mỗi token chỉ dùng cho một ván (bảng `runs`). Nộp lại cùng token chỉ để đổi tên, phải cùng máy và cùng điểm.
-- Client gửi kèm số nhát từng giây, FPS nhận diện và tỉ lệ bám trụ. Server đối chiếu: tổng từng giây phải khớp tổng nhát, trung bình tối đa 8 nhát/giây mỗi tay, giây nào cũng tối đa 10 nhát mỗi tay và không nhanh hơn FPS cho phép, số nhát phải tương xứng với thời gian bám trụ, nhịp đều tăm tắp như máy bị loại. Random: dựng lại thanh Lửa theo từng giây, Lửa đã cạn trước lúc thua là bịa.
+- Client gửi kèm số lọ từng giây, FPS nhận diện và tỉ lệ bám trụ. Server đối chiếu: tổng từng giây phải khớp tổng lọ, trung bình tối đa 8 lọ/giây mỗi tay, giây nào cũng tối đa 10 lọ mỗi tay và không nhanh hơn FPS cho phép, số lọ phải tương xứng với thời gian bám trụ, nhịp đều tăm tắp như máy bị loại. Random: dựng lại thanh Lửa theo từng giây, Lửa đã cạn trước lúc thua là bịa.
 - Cloudflare Turnstile xác minh người thật khi gửi điểm (thường chạy ngầm, chỉ hiện ô tick khi nghi ngờ), cộng giới hạn request theo IP.
 
 Xem các ván đã nộp (số liệu từng ván nằm ở cột `detail`) và gỡ điểm đáng ngờ:
@@ -82,8 +82,8 @@ API (`backend/src/app/routers/`, tài liệu OpenAPI ở `/api/docs`):
 1. Chọn chế độ, chọn thời gian (single / double), bấm **Bật camera & chơi**. Đây là lần bấm chuột duy nhất; từ đây điều khiển hoàn toàn bằng tay.
 2. **Xòe bàn tay**, giữ 1 giây → sẵn sàng.
 3. **Nắm tay như cầm trụ**, giữ yên 1 giây → game đặt **điểm neo** và vẽ thanh trụ ảo tại đó, nghiêng theo đúng hướng tay bạn đang nắm. (Double: cả hai tay cùng nắm. Random: bỏ qua bước này, trụ tự hiện.)
-4. Đếm ngược 3-2-1, rồi **xóc lên xuống dọc theo trụ**. Chỉ những nhát đúng tư thế (tay nắm, nằm trong vùng trụ) mới được tính.
-5. Hết giờ (hoặc hết Lửa): popup hiện tốc độ trung bình / số giây sống sót, danh hiệu, tổng nhát, kỷ lục, và ô gửi điểm lên bảng xếp hạng. **Xòe tay 1 giây** để chơi lại, hoặc bấm **Lưu ảnh** để tải ảnh kết quả 1080×1080.
+4. Đếm ngược 3-2-1, rồi **xóc lên xuống dọc theo trụ**. Chỉ những lọ đúng tư thế (tay nắm, nằm trong vùng trụ) mới được tính.
+5. Hết giờ (hoặc hết Lửa): popup hiện tốc độ trung bình / số giây sống sót, danh hiệu, tổng lọ, kỷ lục, và ô gửi điểm lên bảng xếp hạng. **Xòe tay 1 giây** để chơi lại, hoặc bấm **Lưu ảnh** để tải ảnh kết quả 1080×1080.
 
 ![Đang chơi](docs/play.png)
 ![Kết quả](docs/result.png)
@@ -101,7 +101,7 @@ Mỗi khung hình, MediaPipe trả về 21 điểm khớp của bàn tay. Game t
 | Nắm trụ | Trung bình độ duỗi 4 ngón < 1.45 (ngón trỏ thường duỗi hơn khi cầm trụ nên không xét từng ngón) |
 | Buông trụ (khi chơi) | Từ 3 ngón duỗi thẳng trở lên |
 | Trục trụ | Đường nối khớp ngón trỏ → khớp ngón út lúc đặt neo (làm mượt trong 1 giây giữ yên). Nắm trụ nghiêng thế nào thì trụ nghiêng thế ấy |
-| Một nhát | Vị trí tay chiếu lên trục trụ đi về một phía rồi đảo chiều, biên độ tối thiểu 25% cỡ tay (hysteresis, chống rung). Chuyển động vuông góc với trụ không được tính |
+| Một lọ | Vị trí tay chiếu lên trục trụ đi về một phía rồi đảo chiều, biên độ tối thiểu 25% cỡ tay (hysteresis, chống rung). Chuyển động vuông góc với trụ không được tính |
 | Bám trụ | Tay nắm, lệch khỏi trục < 0.9 cỡ tay và dọc trục < 1.8 cỡ tay so với điểm neo |
 | Gán tay (double) | Mỗi khung, hai bàn tay nhận được ghép vào hai trụ theo khoảng cách gần nhất; lúc chưa có neo thì xếp theo chiều ngang |
 | Trụ ngẫu nhiên | Cỡ trụ lấy theo cỡ tay đo được lúc xòe tay sẵn sàng, nên đứng gần/xa đều vừa tay |
@@ -137,7 +137,7 @@ Nhảy thẳng tới một màn hình để xem giao diện, thêm `mode=single|
 
 ## Ý tưởng tiếp theo
 
-- Rank: chống gian lận chặt hơn bằng chuỗi thời điểm từng nhát
+- Rank: chống gian lận chặt hơn bằng chuỗi thời điểm từng lọ
 - PvP: 1v1 qua WebRTC
 - Rhythm: xóc theo nhịp nhạc
 
