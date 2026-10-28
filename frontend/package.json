@@ -10,7 +10,9 @@
     "typecheck": "tsc -b",
     "lint": "oxlint",
     "test": "vitest run",
-    "brand": "node scripts/build-brand.mjs"
+    "brand": "node scripts/build-brand.mjs",
+    "sound": "sh scripts/sound.sh",
+    "sound:countdown": "sh scripts/countdown-sfx.sh"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "0.10.14",
