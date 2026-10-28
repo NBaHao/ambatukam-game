@@ -35,7 +35,7 @@ export function StartScreen({ mode, duration, onModeChange, onDurationChange, on
         className="mascot-btn"
         aria-label="Ambatukam!"
         onClick={() => {
-          initAudio();
+          void initAudio();
           void ambatukam();
         }}
       >

@@ -9,7 +9,7 @@
 //
 // Engine không phụ thuộc React: nó chạy vòng requestAnimationFrame, vẽ canvas, và ghi trạng thái
 // ra hai Store (ui: đổi theo bước chơi, hud: đổi mỗi khung) để React hiển thị.
-import { beep, countdownHit, countdownStart, initAudio } from "./audio";
+import { audioReady, beep, countdownHit, countdownStart, initAudio } from "./audio";
 import { CameraNoFramesError, startCamera, stopCamera } from "./camera";
 import {
   ANCHOR_HOLD_MS,
@@ -233,7 +233,8 @@ export class GameEngine {
   /** Bấm "Bật camera & chơi": mở camera, tải mô hình, chờ xòe tay */
   async begin(config: RunConfig): Promise<void> {
     if (!this.video) return;
-    initAudio();
+    // Gọi ngay trong lượt bấm để mở khoá Web Audio, nhưng chờ giải mã xong mới cho vào ván
+    void initAudio();
     this.config = config;
     this.setupTracks();
     this.setPhase("ready");
@@ -242,7 +243,7 @@ export class GameEngine {
       await startCamera(this.video);
       this.fitCamera();
       this.ui.update({ boot: { step: "loading" } });
-      await this.loadTracker();
+      await Promise.all([this.loadTracker(), audioReady()]);
       this.ui.update({ boot: { step: "ready" } });
     } catch (err) {
       console.error(err);
