@@ -1,7 +1,9 @@
+import { ambatukam, initAudio } from "../game/audio";
 import { DURATIONS, MODES, isTimed, type Duration, type Mode } from "../game/types";
 import { useI18n } from "../i18n/context";
 import type { TextKey } from "../i18n/strings";
 import { storage } from "../lib/storage";
+import { Mascot } from "./Mascot";
 import { SegmentedControl } from "./SegmentedControl";
 import "./StartScreen.css";
 
@@ -27,6 +29,18 @@ export function StartScreen({ mode, duration, onModeChange, onDurationChange, on
 
   return (
     <div className="screen screen-start">
+      {/* Bấm vào mascot để nghe thử */}
+      <button
+        type="button"
+        className="mascot-btn"
+        aria-label="Ambatukam!"
+        onClick={() => {
+          initAudio();
+          ambatukam();
+        }}
+      >
+        <Mascot mood="idle" />
+      </button>
       <h1>{t("title")}</h1>
       <div className="modes">
         {MODES.map((m) => (

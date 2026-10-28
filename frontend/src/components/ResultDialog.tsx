@@ -4,6 +4,7 @@ import { useScoreSubmission, type SubmitState } from "../hooks/useScoreSubmissio
 import { useI18n, type Translate } from "../i18n/context";
 import type { RunSummary } from "../lib/scoring";
 import { modeName, shareResult } from "../lib/share";
+import { Mascot, type MascotMood } from "./Mascot";
 import { storage } from "../lib/storage";
 import "./ResultDialog.css";
 
@@ -31,6 +32,11 @@ function message(t: Translate, s: SubmitState): string {
   if (s.status === "done") return t("rankLine", s.rank.name, s.rank.rank, s.rank.total);
   if (s.status === "error" || s.status === "off") return t(s.msg);
   return "";
+}
+
+/** Danh hiệu → biểu cảm mascot: 3 (Ambatukam) trở lên là nổ, 2 (Ambatu…) là gồng */
+function moodForTier(tier: number): MascotMood {
+  return tier >= 3 ? "kam" : tier === 2 ? "almost" : "tired";
 }
 
 function metaLine(t: Translate, run: RunResult, summary: RunSummary): string {
@@ -126,6 +132,7 @@ export function ResultDialog({ finished, open, replayProgress, onAgain, onClose,
       <button type="button" className="res-close" aria-label={t("close")} onClick={() => dialogRef.current?.close()}>
         ✕
       </button>
+      <Mascot mood={moodForTier(summary.tier)} className="res-mascot" />
       <p className="res-mode">{modeName(t, run.mode) + (timed ? ` · ${run.duration}s` : "")}</p>
       <div className="res-hero">
         <span className="res-num">{summary.hero}</span>
