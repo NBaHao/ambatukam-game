@@ -116,6 +116,23 @@ Chrome headless không có WebGL thì MediaPipe lỗi (`activeTexture`); chạy 
 
 - Không commit hay push thẳng lên `main`. Mỗi thay đổi một nhánh tách từ `main` mới nhất, tên là `<type>/<mô-tả-kebab-case>` với `type` như commit bên dưới (`fix/android-camera`, `feat/weekly-leaderboard`).
 - Không force push lên `main`, không viết lại lịch sử của nó. Trên nhánh của mình, cần force push thì dùng `git push --force-with-lease`.
+
+**Luôn làm việc trên bản mới nhất của remote.** `main` local có thể cũ (PR merge trên GitHub không tự kéo về máy), nên luôn tách và rebase từ `origin/main`, không dùng `main` local.
+
+```bash
+# Bắt đầu task: lấy remote mới nhất rồi tách nhánh
+git fetch origin --prune
+git switch -c fix/android-camera origin/main
+
+# Trước khi push lần đầu / tạo PR (và khi PR báo "out of date"): cập nhật lại
+git fetch origin
+git rebase origin/main          # có conflict thì sửa, `git rebase --continue`
+make lint test build            # chạy lại sau khi rebase
+git push -u origin HEAD         # đã push trước đó thì: git push --force-with-lease
+```
+
+- Tiếp tục một nhánh đã có: `git fetch origin` rồi `git pull --rebase` trước khi sửa, để không ghi đè commit người khác vừa đẩy lên.
+- Rebase thay vì merge `main` vào nhánh: lịch sử nhánh gọn, squash ra một commit sạch.
 - Lộ secret trong commit: thu hồi / đổi secret trước (`pywrangler secret put`, tạo widget Turnstile mới). Xoá khỏi lịch sử git không làm secret hết lộ.
 
 **Commit**
