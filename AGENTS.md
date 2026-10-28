@@ -21,9 +21,10 @@ frontend/                React 19 + TypeScript + Vite
   src/api/               Client gọi /api, kiểu dữ liệu khớp backend/src/app/schemas.py
   src/i18n/              Chuỗi vi/en, provider, <Rich> (**đậm**)
   src/lib/               storage (localStorage), scoring, share (ảnh kết quả), turnstile
+  src/assets/audio/      Mẫu âm thanh đã cắt sẵn (giọng meme, đếm ngược, nhạc Top 10)
   src/styles/global.css  Token màu, nút, layout chung
   public/                favicon, icon, og.png, site.webmanifest (copy nguyên vào dist)
-  brand/, scripts/       Nguồn og.svg và script dựng icon (`npm run brand`)
+  brand/, scripts/       Nguồn og.svg, dựng icon (`npm run brand`), cắt âm thanh (`npm run sound`, `npm run sound:countdown`)
 backend/                 FastAPI trên Cloudflare Python Workers (quản lý bằng uv + pywrangler)
   src/entry.py           WorkerEntrypoint → ASGI
   src/app/main.py        create_app(): router, error handler, /api/docs
@@ -99,6 +100,7 @@ Chrome headless không có WebGL thì MediaPipe lỗi (`activeTexture`); chạy 
 - Kiểu trong `frontend/src/api/types.ts` ↔ `backend/src/app/schemas.py`; mã lỗi `REJECTED_CODES` ↔ các `ApiError(...)` trong `routers/scores.py`.
 - Tên khoá localStorage trong `frontend/src/lib/storage.ts`: đổi là người chơi mất kỷ lục và mã người chơi.
 - Phiên bản `@mediapipe/tasks-vision` trong `package.json` (ghim cứng) ↔ `MEDIAPIPE_VERSION` ở `src/game/landmarker.ts` (WASM tải từ CDN theo phiên bản này).
+- Mốc cắt mẫu âm thanh trong `frontend/scripts/sound.sh` / `countdown-sfx.sh` ↔ `HYPE_HIT_AT` và nhịp đếm ngược trong `src/game/audio.ts` (đổi file thì nghe lại và đo lại mốc).
 - Đổi luật / ngưỡng chống gian lận: sửa `rules.py` + test trong `backend/tests/`, cập nhật mục chống gian lận trong README.
 
 ## Quy ước code

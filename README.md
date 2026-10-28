@@ -126,6 +126,31 @@ Thư viện MediaPipe đi kèm bundle, WASM và mô hình tải từ CDN lúc ch
 
 Có tiếng Việt và tiếng Anh, chuyển bằng nút VI / EN. Chuỗi nằm ở `frontend/src/i18n/strings.ts`; thêm ngôn ngữ mới = thêm một object cùng kiểu `Strings`.
 
+## Âm thanh
+
+Tiếng bíp và tiếng nổ nhỏ tổng hợp bằng Web Audio; giọng đọc, ba cú trầm và nhạc Top 10 là mẫu cắt sẵn ở `frontend/src/assets/audio`:
+
+| File | Dài | Dùng khi |
+|---|---|---|
+| `hype.mp3` | 3.5s | bấm mascot ở màn bắt đầu |
+| `finish.mp3` | 2.4s | kết ván, danh hiệu Ambatukam trở lên |
+| `almost.mp3` | 1.2s | danh hiệu Ambatu… (code thêm tiếng xịt) |
+| `celebrate.mp3` | 7.7s | lọt Top 10: nhạc + pháo hoa, pháo giấy |
+| `countdown-three/two/one.mp3` | 0.67–0.82s | giọng đọc 3 · 2 · 1 |
+| `countdown-go.mp3` | 0.75s | giọng hô GO |
+| `countdown-tick.mp3` | 0.68s | cú trầm dưới mỗi số (cao dần) |
+| `countdown-impact.mp3` | 2.2s | cú nổ ở GO, ngân sang mấy giây đầu của ván |
+| `countdown-riser.mp3` | 2.45s | tiếng rít dâng suốt 3-2-1, đỉnh đúng lúc GO |
+
+Dựng lại các mẫu:
+
+```bash
+npm run sound --prefix frontend -- /đường/dẫn/tới/thư-mục-gốc   # giọng meme, cần ffmpeg
+npm run sound:countdown --prefix frontend                        # tải + cắt mẫu đếm ngược
+```
+
+Sửa mốc cắt trong script thì nghe lại và cập nhật `HYPE_HIT_AT` ở `src/game/audio.ts`. Cần xem trước hiệu ứng Top 10 khi chạy `make dev-web`: mở `?debug&auto=top10`.
+
 ## Debug
 
 Khi chạy `make dev-web`, mở `http://localhost:5173/?debug` để có dòng chẩn đoán và `window.__amb` (bơm dữ liệu tay giả vào `processFrame`, `fakeHand`, `setMode`, đọc `phase`, `count`, `counts`, `anchors`, `onRod`, `meter`, `rods`).
