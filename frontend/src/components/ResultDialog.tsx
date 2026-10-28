@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { celebrate, stopCelebration } from "../game/audio";
 import { isTimed, type RunResult } from "../game/types";
+import { useRankPreview } from "../hooks/useRankPreview";
 import { useScoreSubmission, type SubmitState } from "../hooks/useScoreSubmission";
 import { useI18n, type Translate } from "../i18n/context";
 import type { RunSummary } from "../lib/scoring";
@@ -31,11 +32,12 @@ interface Props {
   forceCelebrate?: boolean;
 }
 
-function message(t: Translate, s: SubmitState): string {
+/** `claim`: hạng dự kiến trong Top 10 khi chưa gửi, nhắc người chơi nhập tên để giữ chỗ */
+function message(t: Translate, s: SubmitState, claim: number | null): string {
   if (s.status === "sending") return t("submitting");
   if (s.status === "done") return t("rankLine", s.rank.name, s.rank.rank, s.rank.total);
   if (s.status === "error" || s.status === "off") return t(s.msg);
-  return "";
+  return claim ? t("topTenClaim", claim) : "";
 }
 
 /** Danh hiệu → biểu cảm mascot: 3 (Ambatukam) trở lên là nổ, 2 (Ambatu…) là gồng */
@@ -65,8 +67,15 @@ export function ResultDialog({ finished, open, replayProgress, onAgain, onClose,
   const [name, setName] = useState(storage.getName);
   const { state, submit, edit } = useScoreSubmission(run, finished.session, captchaRef);
   const editing = state.status === "form" || state.status === "error";
+  // Chưa có tên thì không tự gửi được: ước hạng từ bảng xếp hạng để báo trước nếu lọt Top 10
+  const [needsName] = useState(() => name.trim() === "");
+  const preview = useRankPreview(run, needsName);
+  // Hạng server trả về lần gửi gần nhất: bấm "Đổi tên" (về lại form) vẫn giữ pháo hoa
+  const [sentRank, setSentRank] = useState<number | null>(null);
+  if (state.status === "done" && state.rank.rank !== sentRank) setSentRank(state.rank.rank);
   // Lọt Top 10 là có pháo hoa + nhạc chúc mừng
-  const top10 = state.status === "done" && state.rank.rank <= 10;
+  const rank = state.status === "off" ? null : state.status === "done" ? state.rank.rank : (sentRank ?? preview);
+  const top10 = rank !== null && rank <= 10;
   const party = open && (top10 || Boolean(forceCelebrate));
 
   useEffect(() => {
@@ -183,7 +192,7 @@ export function ResultDialog({ finished, open, replayProgress, onAgain, onClose,
         </form>
         <div ref={captchaRef} className="turnstile" />
         <p className="submit-msg" role="status" aria-live="polite">
-          {message(t, state)}
+          {message(t, state, top10 && sentRank === null ? rank : null)}
         </p>
         <div className="row links">
           {state.status === "done" && (
