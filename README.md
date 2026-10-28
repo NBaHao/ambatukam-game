@@ -30,11 +30,10 @@ Deploy: Cloudflare Workers Builds tự build và deploy khi push lên `main`. De
 ```bash
 cd backend
 uv run pywrangler login
-uv run pywrangler d1 migrations apply ambatukam-leaderboard --remote
 openssl rand -hex 32 | uv run pywrangler secret put TOKEN_SECRET   # lần đầu
 uv run pywrangler secret put TURNSTILE_SECRET                      # lần đầu
 # sitekey: Build variable VITE_TURNSTILE_SITE_KEY trên Cloudflare (deploy tay: frontend/.env.production, đã gitignore)
-cd .. && make deploy
+cd .. && make deploy                                               # áp migration D1 còn thiếu rồi deploy
 ```
 
 Toàn bộ nằm trong free tier của Cloudflare (Workers 100k request/ngày, D1 5 GB).

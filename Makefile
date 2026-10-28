@@ -35,6 +35,7 @@ migrate-local:
 migrate-remote:
 	cd backend && uv run pywrangler d1 migrations apply ambatukam-leaderboard --remote
 
-# Deploy tay từ máy mình: cần frontend/.env.production (gitignore) chứa sitekey thật
+# Deploy tay từ máy mình: cần frontend/.env.production (gitignore) chứa sitekey thật.
+# Cùng script với Workers Builds: áp migration D1 còn thiếu rồi mới deploy.
 deploy: build
-	cd backend && uv run pywrangler deploy
+	backend/scripts/deploy.sh
