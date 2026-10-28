@@ -110,6 +110,72 @@ Chrome headless không có WebGL thì MediaPipe lỗi (`activeTexture`); chạy 
 - Đổi schema D1: thêm file migration mới `backend/migrations/000N_*.sql`, không sửa migration đã chạy.
 - Không thu thập IP / quốc gia người chơi cho chống gian lận (IP chỉ dùng làm khoá rate limit, không lưu).
 
+## Git, commit và PR
+
+`main` là production: mỗi commit vào `main` được Workers Builds deploy ngay. Vì vậy:
+
+- Không commit hay push thẳng lên `main`. Mỗi thay đổi một nhánh tách từ `main` mới nhất, tên là `<type>/<mô-tả-kebab-case>` với `type` như commit bên dưới (`fix/android-camera`, `feat/weekly-leaderboard`).
+- Không force push lên `main`, không viết lại lịch sử của nó. Trên nhánh của mình, cần force push thì dùng `git push --force-with-lease`.
+- Lộ secret trong commit: thu hồi / đổi secret trước (`pywrangler secret put`, tạo widget Turnstile mới). Xoá khỏi lịch sử git không làm secret hết lộ.
+
+**Commit**
+
+Theo [Conventional Commits](https://www.conventionalcommits.org/): `<type>(<scope>): <mô tả>`. Commit cũ trước khi có quy tắc này không theo chuẩn, đừng bắt chước.
+
+| `type` | Dùng khi |
+|---|---|
+| `feat` | Tính năng mới người chơi thấy được |
+| `fix` | Sửa lỗi |
+| `perf` | Nhanh hơn / nhẹ hơn, hành vi không đổi |
+| `refactor` | Đổi cấu trúc code, hành vi không đổi |
+| `test` | Chỉ thêm / sửa test |
+| `docs` | README, AGENTS.md, comment |
+| `style` | Định dạng code (ruff format…), không đổi logic. CSS giao diện là `feat` / `fix` |
+| `build` | Dependency, Vite, wrangler, Makefile |
+| `ci` | `.github/workflows/` |
+| `chore` | Việc lặt vặt khác (gitignore, dọn file) |
+| `revert` | Hoàn tác một commit trước |
+
+- `scope` (tuỳ chọn): `frontend`, `backend`, `game` (engine), `api`, `db` (migration D1), `i18n`, `deploy`. Đụng nhiều chỗ thì bỏ scope.
+- Mô tả: tiếng Anh, thể mệnh lệnh, chữ thường đầu câu, không chấm cuối, cả dòng dưới ~72 ký tự.
+- Thay đổi phá tương thích (đổi API, đổi khoá localStorage, migration không chạy ngược được): thêm `!` sau type/scope và dòng `BREAKING CHANGE: …` ở phần thân.
+- Dòng thứ hai để trống. Phần thân nói **tại sao** và tác động, không kể lại diff; nhiều ý thì gạch đầu dòng, xuống dòng ở ~72 ký tự.
+- Một commit một thay đổi có nghĩa; không trộn sửa lỗi, refactor và đổi định dạng hàng loạt.
+
+```
+fix(game): fall back to CPU when the GPU delegate finds no hands
+
+Samsung S25 creates the GPU delegate without error but returns no
+landmarks. Self-test on a bundled sample image and switch to CPU.
+```
+
+```
+feat(api)!: require a Turnstile token on score submit
+
+BREAKING CHANGE: POST /api/scores rejects requests without `captcha`.
+```
+- Trước khi commit:
+  - `make lint test build` phải xanh.
+  - Đọc lại `git status` và `git diff --staged`: không có file env, secret, `dist/`, `.wrangler/`, file debug.
+  - Sửa `package.json` / `pyproject.toml` thì commit kèm lockfile (`package-lock.json` / `uv.lock`).
+- Không bỏ qua hook hay kiểm tra (`--no-verify`).
+
+**Pull request**
+
+- PR vào `main`. Tiêu đề **bắt buộc** đúng định dạng commit (`feat(backend): add weekly leaderboard`): Squash and merge lấy tiêu đề PR làm message commit trên `main`. Mô tả gồm:
+  - Thay đổi gì và vì sao.
+  - Đã test thế nào (lệnh đã chạy, thiết bị / trình duyệt đã thử). Đổi giao diện thì kèm ảnh chụp.
+  - **Việc cần làm trên Cloudflare** nếu có: migration D1 mới, secret mới (`pywrangler secret put`), Build variable mới, đổi widget Turnstile.
+- Merge khi CI GitHub (`frontend`, `backend`) xanh. Dùng **Squash and merge** để `main` mỗi PR một commit, rồi xoá nhánh.
+- Preview Builds của Cloudflare đang tắt, nên PR chỉ có CI GitHub; lần build Cloudflare thật đầu tiên là lúc merge. Sau khi merge, xem build trong dashboard (Workers → ambatukam → Deployments) và làm bước 6 ở checklist Deploy bên dưới.
+
+**Riêng cho AI agent**
+
+- Chỉ commit, push, tạo PR khi người dùng yêu cầu. Không bao giờ tự merge PR, xoá nhánh của người khác hay đổi cấu hình GitHub / Cloudflare.
+- Không chạy lệnh mất dữ liệu (`git reset --hard`, `git clean -fd`, `git checkout -- .`, force push) khi chưa hỏi; có thay đổi chưa commit thì sao lưu trước (`git stash` hoặc `git diff > /tmp/…`).
+- Commit do agent viết thêm trailer `Co-Authored-By:` ghi model; mô tả PR do agent viết ghi rõ là do agent tạo.
+- Không dán secret, token, nội dung `.dev.vars` vào commit, PR, issue hay log.
+
 ## Deploy
 
 Workers Builds (Cloudflare dashboard → Workers → ambatukam → Settings → Build) tự deploy khi push lên `main`. Cấu hình:
@@ -122,6 +188,12 @@ Workers Builds (Cloudflare dashboard → Workers → ambatukam → Settings → 
 | Deploy command | `cd backend && uv run pywrangler d1 migrations apply ambatukam-leaderboard --remote && uv run pywrangler deploy` |
 
 Worker secrets (`TOKEN_SECRET`, `TURNSTILE_SECRET`) nằm ở Settings → Variables and secrets (runtime), khác với Build variables ở trên.
+
+Preview Builds đang tắt (Settings → Build → Branch control → **Enable Preview Builds**). Muốn bật lại thì cần:
+
+- Thêm khối `previews` vào `wrangler.jsonc`, kèm D1 staging riêng để không lẫn điểm thật.
+- Đặt secret riêng cho preview.
+- Thêm hostname preview vào widget Turnstile.
 
 GitHub Actions (`.github/workflows/ci.yml`) chỉ kiểm tra: typecheck, lint, test, build, ruff, pytest, `pywrangler deploy --dry-run`. Không cần GitHub secret nào.
 
