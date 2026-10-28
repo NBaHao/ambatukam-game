@@ -52,28 +52,69 @@ function load(name: ClipName): Promise<AudioBuffer | null> {
   return p ?? Promise.resolve(null);
 }
 
-export function initAudio(): void {
-  ctx ??= new AudioContext();
+/** Đường tiếng cho mọi hiệu ứng (không gồm nhạc chúc mừng), để hạ nhỏ khi nhạc vào */
+let sfx: GainNode | null = null;
+/** Lần tải + giải mã đầu tiên; `begin()` chờ nó để nhịp đếm ngược đầu tiên không bị mất tiếng */
+let ready: Promise<void> | null = null;
+
+/**
+ * Gọi trong lượt bấm của người dùng. Trả về promise giải mã xong toàn bộ mẫu:
+ * máy chậm / mạng chậm thì chờ, đừng để mấy nhịp đầu chạy trong im lặng.
+ */
+export function initAudio(): Promise<void> {
+  if (!ctx) {
+    ctx = new AudioContext();
+    sfx = ctx.createGain();
+    sfx.connect(ctx.destination);
+    // iOS chỉ mở khoá Web Audio khi có buffer phát ngay trong lượt bấm
+    const unlock = ctx.createBufferSource();
+    unlock.buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+    unlock.connect(ctx.destination);
+    unlock.start(0);
+  }
   void ctx.resume();
-  for (const name of Object.keys(CLIPS) as ClipName[]) void load(name);
+  ready ??= Promise.all((Object.keys(CLIPS) as ClipName[]).map((name) => load(name))).then(() => undefined);
+  return ready;
+}
+
+/** Chờ mẫu giải mã xong (gọi trước khi bắt đầu đếm ngược) */
+export function audioReady(): Promise<void> {
+  return ready ?? Promise.resolve();
+}
+
+/** Nhạc chúc mừng vào thì hạ nhỏ tiếng cũ (giọng kết ván, tiếng nổ) thay vì cắt phựt */
+function duckSfx(level = 0.15, sec = 0.35): void {
+  if (!ctx || !sfx) return;
+  const t = ctx.currentTime;
+  sfx.gain.cancelScheduledValues(t);
+  sfx.gain.setValueAtTime(sfx.gain.value, t);
+  sfx.gain.linearRampToValueAtTime(level, t + sec);
+}
+
+function unduckSfx(sec = 0.4): void {
+  if (!ctx || !sfx) return;
+  const t = ctx.currentTime;
+  sfx.gain.cancelScheduledValues(t);
+  sfx.gain.setValueAtTime(sfx.gain.value, t);
+  sfx.gain.linearRampToValueAtTime(1, t + sec);
 }
 
 export function beep(freq: number, ms = 60, vol = 0.08, type: OscillatorType = "square"): void {
-  if (!ctx) return;
+  if (!ctx || !sfx) return;
   const o = ctx.createOscillator();
   const g = ctx.createGain();
   o.type = type;
   o.frequency.value = freq;
   g.gain.setValueAtTime(vol, ctx.currentTime);
   g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + ms / 1000);
-  o.connect(g).connect(ctx.destination);
+  o.connect(g).connect(sfx);
   o.start();
   o.stop(ctx.currentTime + ms / 1000);
 }
 
 /** Một nốt trượt tần số from → to (Hz), bắt đầu sau `at` giây */
 function slide(from: number, to: number, sec: number, vol: number, type: OscillatorType, at = 0): void {
-  if (!ctx) return;
+  if (!ctx || !sfx) return;
   const t0 = ctx.currentTime + at;
   const t1 = t0 + sec;
   const o = ctx.createOscillator();
@@ -84,14 +125,14 @@ function slide(from: number, to: number, sec: number, vol: number, type: Oscilla
   g.gain.setValueAtTime(0.0001, t0);
   g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
   g.gain.exponentialRampToValueAtTime(0.0001, t1);
-  o.connect(g).connect(ctx.destination);
+  o.connect(g).connect(sfx);
   o.start(t0);
   o.stop(t1);
 }
 
 /** Tiếng xì (nhiễu trắng qua lọc), bắt đầu sau `at` giây */
 function noise(sec: number, vol: number, filterFrom: number, filterTo: number, at = 0): void {
-  if (!ctx) return;
+  if (!ctx || !sfx) return;
   const t0 = ctx.currentTime + at;
   const t1 = t0 + sec;
   const buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * sec), ctx.sampleRate);
@@ -106,7 +147,7 @@ function noise(sec: number, vol: number, filterFrom: number, filterTo: number, a
   filter.frequency.exponentialRampToValueAtTime(filterTo, t1);
   g.gain.setValueAtTime(vol, t0);
   g.gain.exponentialRampToValueAtTime(0.0001, t1);
-  src.connect(filter).connect(g).connect(ctx.destination);
+  src.connect(filter).connect(g).connect(sfx);
   src.start(t0);
 }
 
@@ -123,15 +164,15 @@ interface PlayOptions {
   fadeOut?: number;
   /** Tốc độ phát, 1 = nguyên bản */
   rate?: number;
-  /** Trễ bao nhiêu giây mới phát (để tiếng nổ ngân ra trước rồi mới tới giọng) */
-  delay?: number;
+  /** Nhạc chúc mừng: đi thẳng ra loa, không qua đường tiếng bị hạ nhỏ */
+  music?: boolean;
 }
 
 /** Phát một mẫu đã giải mã, trả về source để tắt giữa chừng */
-function startClip(buf: AudioBuffer, { vol = 1, fadeIn = 0, fadeOut = 0, rate = 1, delay = 0 }: PlayOptions = {}): AudioBufferSourceNode | null {
-  if (!ctx) return null;
+function startClip(buf: AudioBuffer, { vol = 1, fadeIn = 0, fadeOut = 0, rate = 1, music = false }: PlayOptions = {}): AudioBufferSourceNode | null {
+  if (!ctx || !sfx) return null;
   if (ctx.state === "suspended") void ctx.resume();
-  const t0 = ctx.currentTime + delay;
+  const t0 = ctx.currentTime;
   const duration = buf.duration / rate;
   const end = t0 + duration;
   const g = ctx.createGain();
@@ -148,7 +189,7 @@ function startClip(buf: AudioBuffer, { vol = 1, fadeIn = 0, fadeOut = 0, rate = 
     g.gain.setValueAtTime(vol, Math.max(t0, end - fadeOut));
     g.gain.exponentialRampToValueAtTime(0.0001, end);
   }
-  src.connect(g).connect(ctx.destination);
+  src.connect(g).connect(music ? ctx.destination : sfx);
   src.start(t0);
   return src;
 }
@@ -194,8 +235,7 @@ export function countdownHit(last: boolean, step = 0): void {
   if (last) {
     void Promise.all([load("impact"), load("go")]).then(([impact, voice]) => {
       if (impact) startClip(impact, { vol: 0.4 });
-      // Giọng hô vào sau cú nổ một nhịp ngắn, nghe rõ hơn là chồng đúng lúc
-      if (voice) startClip(voice, { vol: 0.72, delay: 0.06 });
+      if (voice) startClip(voice, { vol: 0.72 });
     });
     return;
   }
@@ -206,16 +246,21 @@ export function countdownHit(last: boolean, step = 0): void {
   });
 }
 
-/** Nhạc chúc mừng khi vào Top 10: chỉ nhạc, hiệu ứng pháo để phần hình lo */
+/**
+ * Nhạc chúc mừng khi vào Top 10: chỉ nhạc, hiệu ứng pháo để phần hình lo.
+ * Nhạc mở hết âm lượng ngay từ đầu; tiếng cũ (giọng kết ván, tiếng nổ) hạ nhỏ dần.
+ */
 export async function celebrate(): Promise<void> {
   const seq = ++celebrationSeq;
+  duckSfx();
   const buf = await load("celebrate");
   if (!ctx || seq !== celebrationSeq) return;
   if (buf) {
-    const src = startClip(buf, { vol: 0.9, fadeIn: 0.05, fadeOut: 1.5 });
+    const src = startClip(buf, { vol: 1, music: true, fadeOut: 1.5 });
     if (src) {
       src.onended = () => {
         if (celebration === src) celebration = null;
+        unduckSfx();
       };
       celebration = src;
     }
@@ -225,6 +270,7 @@ export async function celebrate(): Promise<void> {
 /** Tắt nhạc chúc mừng (đóng popup / chơi ván mới) */
 export function stopCelebration(): void {
   celebrationSeq++;
+  unduckSfx();
   if (!celebration) return;
   try {
     celebration.stop();
