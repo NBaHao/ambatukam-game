@@ -1,0 +1,21 @@
+/* Mascot "Trụ": chuyển động theo biểu cảm */
+.mascot { display: block; width: 72px; height: auto; overflow: visible; }
+.mascot-body { transform-box: fill-box; transform-origin: 50% 100%; }
+.mascot-burst { transform-box: fill-box; transform-origin: 50% 50%; }
+
+.mascot-idle .mascot-body { animation: mascot-bob 2.4s ease-in-out infinite; }
+.mascot-tired .mascot-body { animation: mascot-sway 3s ease-in-out infinite; }
+.mascot-almost .mascot-body { animation: mascot-shake .12s linear infinite; }
+.mascot-kam .mascot-body { animation: mascot-pop .5s cubic-bezier(.2, 1.6, .4, 1) both, mascot-bob 1s ease-in-out .5s infinite; }
+.mascot-kam .mascot-burst { animation: mascot-burst .5s ease-out both, mascot-spin 8s linear .5s infinite; }
+
+@keyframes mascot-bob { 50% { transform: translateY(-4px); } }
+@keyframes mascot-sway { 25% { transform: rotate(-3deg); } 75% { transform: rotate(3deg); } }
+@keyframes mascot-shake { 25% { transform: translateX(-1.5px); } 75% { transform: translateX(1.5px); } }
+@keyframes mascot-pop { from { transform: scale(.4) translateY(20px); } }
+@keyframes mascot-burst { from { transform: scale(0); opacity: 0; } }
+@keyframes mascot-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .mascot .mascot-body, .mascot .mascot-burst { animation: none; }
+}

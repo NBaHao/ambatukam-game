@@ -21,3 +21,8 @@
   .sub { font-size: 14px; }
   .fine { font-size: 11px; margin-top: 0; }
 }
+
+/* Mascot trên tiêu đề, bấm để nghe "Ambatukam!" */
+.mascot-btn { border: 0; padding: 4px; margin-bottom: -8px; border-radius: 50%; }
+.mascot-btn:active .mascot { transform: scale(.94); }
+@media (max-width: 640px) { .mascot-btn .mascot { width: 56px; } }

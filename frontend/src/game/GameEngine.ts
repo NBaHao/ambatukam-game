@@ -9,7 +9,7 @@
 //
 // Engine không phụ thuộc React: nó chạy vòng requestAnimationFrame, vẽ canvas, và ghi trạng thái
 // ra hai Store (ui: đổi theo bước chơi, hud: đổi mỗi khung) để React hiển thị.
-import { beep, initAudio } from "./audio";
+import { beep, countdownHit, countdownStart, initAudio } from "./audio";
 import { CameraNoFramesError, startCamera, stopCamera } from "./camera";
 import {
   ANCHOR_HOLD_MS,
@@ -541,12 +541,12 @@ export class GameEngine {
   // ---------- Vòng chơi ----------
   private startCountdown(): void {
     this.setPhase("countdown");
-    beep(880, 120, 0.08, "sine");
+    countdownStart();
     COUNTDOWN_STEPS.forEach((step, i) => {
       this.later(() => {
         this.ui.update({ countdown: step });
         const last = i === COUNTDOWN_STEPS.length - 1;
-        beep(last ? 880 : 520, last ? 250 : 120, 0.1, "sine");
+        countdownHit(last, i);
         if (last) this.later(() => this.startPlaying(), 400);
       }, i * COUNTDOWN_STEP_MS);
     });

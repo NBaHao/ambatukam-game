@@ -9,7 +9,7 @@ import { PowerBar } from "./components/PowerBar";
 import { ReadyScreen } from "./components/ReadyScreen";
 import { ResultDialog, type FinishedRun } from "./components/ResultDialog";
 import { StartScreen } from "./components/StartScreen";
-import { say } from "./game/audio";
+import { ambatu, ambatukamFinish } from "./game/audio";
 import { MODES, isTimed, type Duration, type Mode } from "./game/types";
 import { useGameEngine } from "./hooks/useGameEngine";
 import { useStore } from "./hooks/useStore";
@@ -59,7 +59,8 @@ export function App() {
         const summary = summarize(run, prevBest);
         const session = sessionRef.current;
         setFinished((prev) => ({ id: (prev?.id ?? 0) + 1, run, summary, session }));
-        if (summary.tier >= 3) say("Ambatukam!");
+        if (summary.tier >= 3) void ambatukamFinish();
+        else if (summary.tier === 2) void ambatu();
       },
     });
   }, [engine]);
@@ -133,6 +134,7 @@ export function App() {
           onClose={goHome}
           onOpenBoard={() => setView("board")}
           onTypingChange={setTyping}
+          forceCelebrate={DEBUG && params.get("auto") === "top10"}
         />
       )}
 

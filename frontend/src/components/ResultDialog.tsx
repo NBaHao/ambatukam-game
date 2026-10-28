@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { celebrate, stopCelebration } from "../game/audio";
 import { isTimed, type RunResult } from "../game/types";
 import { useScoreSubmission, type SubmitState } from "../hooks/useScoreSubmission";
 import { useI18n, type Translate } from "../i18n/context";
 import type { RunSummary } from "../lib/scoring";
 import { modeName, shareResult } from "../lib/share";
+import { Celebration } from "./Celebration";
+import { Mascot, type MascotMood } from "./Mascot";
 import { storage } from "../lib/storage";
 import "./ResultDialog.css";
 
@@ -24,6 +27,8 @@ interface Props {
   onClose: () => void;
   onOpenBoard: () => void;
   onTypingChange: (typing: boolean) => void;
+  /** Chỉ dùng khi dev (?debug&auto=top10): xem trước hiệu ứng Top 10 dù chưa gửi điểm */
+  forceCelebrate?: boolean;
 }
 
 function message(t: Translate, s: SubmitState): string {
@@ -31,6 +36,11 @@ function message(t: Translate, s: SubmitState): string {
   if (s.status === "done") return t("rankLine", s.rank.name, s.rank.rank, s.rank.total);
   if (s.status === "error" || s.status === "off") return t(s.msg);
   return "";
+}
+
+/** Danh hiệu → biểu cảm mascot: 3 (Ambatukam) trở lên là nổ, 2 (Ambatu…) là gồng */
+function moodForTier(tier: number): MascotMood {
+  return tier >= 3 ? "kam" : tier === 2 ? "almost" : "tired";
 }
 
 function metaLine(t: Translate, run: RunResult, summary: RunSummary): string {
@@ -42,11 +52,11 @@ function metaLine(t: Translate, run: RunResult, summary: RunSummary): string {
 }
 
 /** Popup kết quả: điểm, danh hiệu, gửi điểm lên bảng xếp hạng. Mỗi ván một instance (key = id). */
-export function ResultDialog({ finished, open, replayProgress, onAgain, onClose, onOpenBoard, onTypingChange }: Props) {
+export function ResultDialog({ finished, open, replayProgress, onAgain, onClose, onOpenBoard, onTypingChange, forceCelebrate }: Props) {
   const { t, strings } = useI18n();
   const { run, summary } = finished;
   const timed = isTimed(run.mode);
-  const [title] = strings.tiers[summary.tier];
+  const title = strings.tiers[summary.tier];
 
   const dialogRef = useRef<HTMLDialogElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -55,6 +65,15 @@ export function ResultDialog({ finished, open, replayProgress, onAgain, onClose,
   const [name, setName] = useState(storage.getName);
   const { state, submit, edit } = useScoreSubmission(run, finished.session, captchaRef);
   const editing = state.status === "form" || state.status === "error";
+  // Lọt Top 10 là có pháo hoa + nhạc chúc mừng
+  const top10 = state.status === "done" && state.rank.rank <= 10;
+  const party = open && (top10 || Boolean(forceCelebrate));
+
+  useEffect(() => {
+    if (!party) return;
+    void celebrate();
+    return stopCelebration;
+  }, [party]);
 
   const send = () => {
     const value = name.trim();
@@ -123,15 +142,22 @@ export function ResultDialog({ finished, open, replayProgress, onAgain, onClose,
 
   return (
     <dialog ref={dialogRef} className="result" aria-labelledby="res-title">
+      <Celebration active={party} />
       <button type="button" className="res-close" aria-label={t("close")} onClick={() => dialogRef.current?.close()}>
         ✕
       </button>
+      <Mascot mood={moodForTier(summary.tier)} className="res-mascot" />
       <p className="res-mode">{modeName(t, run.mode) + (timed ? ` · ${run.duration}s` : "")}</p>
       <div className="res-hero">
         <span className="res-num">{summary.hero}</span>
         <span className="res-unit">{t(timed ? "avg" : "survived")}</span>
       </div>
       <h2 id="res-title">{title}</h2>
+      {(top10 || forceCelebrate) && (
+        <p className="res-top">
+          <span aria-hidden="true">🏆</span> {t("topTen")}
+        </p>
+      )}
       <p className="res-meta">{metaLine(t, run, summary)}</p>
 
       <div className="rank">

@@ -12,12 +12,24 @@
 
 .res-close { position: absolute; top: 8px; right: 8px; border: 0; color: var(--mute); font-size: 16px; line-height: 1; padding: 8px; }
 .res-close:hover { color: var(--fg); }
+.res-mascot { width: 64px; margin: -6px 0 2px; }
 .res-mode { margin: 0; font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--mute); }
 .res-hero { display: flex; flex-direction: column; align-items: center; }
 .res-num { font-family: var(--mono); font-size: 84px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
 .res-unit { color: var(--mute); font-size: 12px; text-transform: uppercase; letter-spacing: .1em; margin-top: 6px; }
 .result h2 { font-size: 20px; }
 .res-meta { margin: 0; font-family: var(--mono); font-size: 13px; color: var(--mute); }
+
+/* Huy hiệu lọt Top 10 (hiện sau khi gửi điểm thành công) */
+.res-top {
+  display: inline-flex; align-items: center; gap: 6px; margin: 2px 0 0;
+  padding: 3px 12px; border: 1px solid var(--accent); border-radius: 999px;
+  color: var(--accent); font-family: var(--mono); font-size: 12px; font-weight: 700;
+  letter-spacing: .14em; text-transform: uppercase;
+  animation: top-pop .35s cubic-bezier(.2, 1.6, .4, 1);
+}
+@keyframes top-pop { from { opacity: 0; transform: scale(.8); } }
+@media (prefers-reduced-motion: reduce) { .res-top { animation: none; } }
 
 /* Gửi điểm lên bảng xếp hạng */
 .rank {
@@ -47,4 +59,5 @@
 @media (max-width: 640px) {
   .result { width: 100%; max-width: none; margin: auto 0 0; border-radius: 14px 14px 0 0; border-bottom: 0; padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
   .res-num { font-size: 56px; }
+  .res-mascot { width: 48px; }
 }
