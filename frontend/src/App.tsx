@@ -134,6 +134,7 @@ export function App() {
           onClose={goHome}
           onOpenBoard={() => setView("board")}
           onTypingChange={setTyping}
+          forceCelebrate={DEBUG && params.get("auto") === "top10"}
         />
       )}
 

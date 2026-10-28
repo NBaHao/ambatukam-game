@@ -74,7 +74,7 @@ export function installDebug(engine: GameEngine, params: URLSearchParams, app: A
   };
 
   const auto = params.get("auto");
-  if (auto !== "result" && auto !== "play") return;
+  if (auto !== "result" && auto !== "play" && auto !== "top10") return;
 
   const fromUrl = params.get("mode") as Mode | null;
   const mode = fromUrl && MODES.includes(fromUrl) ? fromUrl : "single";

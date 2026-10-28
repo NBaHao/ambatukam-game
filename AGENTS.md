@@ -89,7 +89,7 @@ Trước khi commit: `make lint test build` phải xanh.
 Chỉ có khi chạy `vite dev` (bị loại khỏi bản build):
 
 - `?debug`: hiện dòng chẩn đoán (delegate, fps, số tay) và `window.__amb` (`processFrame`, `fakeHand`, `useFakeCamera`, `setMode`, đọc `phase`, `count`, `counts`, `anchors`, `onRod`, `meter`, `rods`).
-- `?debug&auto=result&mode=double&lang=vi`: nhảy thẳng tới popup kết quả. `auto=play` để xem HUD đang chơi.
+- `?debug&auto=result&mode=double&lang=vi`: nhảy thẳng tới popup kết quả. `auto=play` để xem HUD đang chơi, `auto=top10` để xem trước hiệu ứng lọt Top 10 (pháo hoa + pháo giấy).
 - `?delegate=CPU|GPU` ép delegate MediaPipe; `?mode=`, `?lang=` chọn sẵn chế độ / ngôn ngữ.
 
 Chrome headless không có WebGL thì MediaPipe lỗi (`activeTexture`); chạy với `--use-angle=swiftshader --enable-unsafe-swiftshader`.
