@@ -67,9 +67,9 @@ export function ResultDialog({ finished, open, replayProgress, onAgain, onClose,
   const [name, setName] = useState(storage.getName);
   const { state, submit, edit } = useScoreSubmission(run, finished.session, captchaRef);
   const editing = state.status === "form" || state.status === "error";
-  // Chưa có tên thì không tự gửi được: ước hạng từ bảng xếp hạng để báo trước nếu lọt Top 10
-  const [needsName] = useState(() => name.trim() === "");
-  const preview = useRankPreview(run, needsName);
+  // Ước hạng từ bảng xếp hạng ngay khi mở popup: người mới chưa có tên vẫn biết mình lọt Top 10,
+  // người đã có tên không phải chờ Turnstile + gửi điểm (vài giây) mới thấy pháo hoa
+  const preview = useRankPreview(run);
   // Hạng server trả về lần gửi gần nhất: bấm "Đổi tên" (về lại form) vẫn giữ pháo hoa
   const [sentRank, setSentRank] = useState<number | null>(null);
   if (state.status === "done" && state.rank.rank !== sentRank) setSentRank(state.rank.rank);
