@@ -1,4 +1,4 @@
-# Kiểm tra nhanh trên mỗi PR / push. Deploy do Cloudflare Workers Builds lo (nối repo trên dashboard).
+# Kiểm tra trên mỗi PR / push. Deploy do Cloudflare Workers Builds lo (xem AGENTS.md).
 name: CI
 
 on:
@@ -7,14 +7,50 @@ on:
     branches: [main]
 
 jobs:
-  check:
+  frontend:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
-      - name: Kiểm tra cú pháp JS
-        run: node --check game.js && node --check worker/src/index.js
-      - name: Kiểm tra cấu hình Worker và đóng gói thử (không deploy)
-        run: npx --yes wrangler@4 deploy --dry-run --outdir /tmp/dist
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          retention-days: 1
+
+  backend:
+    runs-on: ubuntu-latest
+    needs: frontend
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ">=0.13.4"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pytest
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+      - name: Đóng gói thử Worker (không deploy)
+        run: uv run pywrangler deploy --dry-run --outdir /tmp/worker-dist

@@ -1,0 +1,8 @@
+/* Thanh hướng dẫn cử chỉ ở đầu khung camera */
+.gesture {
+  position: absolute; top: 12px; left: 12px; right: 12px; z-index: 5;
+  background: rgba(11, 11, 11, .88); border: 1px solid var(--line); border-radius: 4px;
+  padding: 10px 14px 0;
+}
+.gbar { margin-top: 10px; height: 2px; background: var(--line); }
+.gbar-fill { height: 100%; width: 0; background: var(--fg); }

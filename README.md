@@ -12,38 +12,29 @@ Toàn bộ nhận diện tay chạy trong trình duyệt, video không rời kh�
 
 ## Chạy local
 
-Không cần cài gì. Chỉ cần một HTTP server tĩnh (trình duyệt không cho mở camera từ `file://`):
+Frontend React + TypeScript (Vite), backend FastAPI chạy trên Cloudflare Python Workers + D1. Cần Node 22+ và [uv](https://docs.astral.sh/uv/) ≥ 0.13.4.
 
 ```bash
 git clone https://github.com/NBaHao/ambatukam-game.git
 cd ambatukam-game
-python3 -m http.server 5173
+make install                                   # npm ci + uv sync
+cp backend/.dev.vars.example backend/.dev.vars # khoá local (Turnstile: khoá thử, luôn qua)
+make migrate-local                             # tạo bảng D1 local (lần đầu)
+make dev-api                                   # API + Worker: http://localhost:8787
+make dev-web                                   # giao diện: http://localhost:5173 (mở cái này)
 ```
 
-Mở http://localhost:5173 rồi cho phép camera.
+Trình duyệt chỉ cho mở camera trên `localhost` hoặc HTTPS. Biến môi trường, secret, quy ước code và cách deploy ghi ở [AGENTS.md](AGENTS.md).
 
-Cách khác nếu đã có Node: `npx serve .`
-
-Khi đưa lên mạng phải dùng HTTPS (GitHub Pages, Vercel, Netlify… đều được), vì trình duyệt chỉ cho mở camera trên `localhost` hoặc HTTPS.
-
-### Chạy kèm bảng xếp hạng
-
-Game và API bảng xếp hạng chạy chung một Cloudflare Worker (file tĩnh + `/api/*`). Cần Node:
+Deploy: Cloudflare Workers Builds tự build và deploy khi push lên `main`. Deploy tay:
 
 ```bash
-echo "TOKEN_SECRET=dev" > .dev.vars                                                   # khoá ký token khi chạy local
-npx wrangler d1 execute ambatukam-leaderboard --local --file worker/schema.sql        # tạo bảng (lần đầu)
-npx wrangler dev                                                                      # http://localhost:8787
-```
-
-Deploy:
-
-```bash
-npx wrangler login
-npx wrangler d1 create ambatukam-leaderboard          # lần đầu; dán database_id vào wrangler.jsonc
-npx wrangler d1 execute ambatukam-leaderboard --remote --file worker/schema.sql
-openssl rand -hex 32 | npx wrangler secret put TOKEN_SECRET
-npx wrangler deploy
+cd backend
+uv run pywrangler login
+uv run pywrangler d1 migrations apply ambatukam-leaderboard --remote
+openssl rand -hex 32 | uv run pywrangler secret put TOKEN_SECRET   # lần đầu
+uv run pywrangler secret put TURNSTILE_SECRET                      # lần đầu; sitekey nằm ở frontend/.env.production
+cd .. && make deploy
 ```
 
 Toàn bộ nằm trong free tier của Cloudflare (Workers 100k request/ngày, D1 5 GB).
@@ -61,20 +52,29 @@ Kỷ lục lưu riêng cho từng chế độ (và từng mốc thời gian) tro
 
 ## Bảng xếp hạng
 
-Chơi bằng camera xong, nhập tên ở màn kết quả để gửi điểm. Lần sau game nhớ tên và tự gửi. Mỗi máy giữ một dòng điểm cao nhất cho mỗi chế độ và mốc thời gian (định danh bằng mã ngẫu nhiên trong `localStorage`, không cần đăng nhập). Chơi bằng phím không được xếp hạng.
+Hết ván, popup kết quả hiện điểm và ô nhập tên để gửi điểm; gửi xong popup hiện hạng của bạn. Lần sau game nhớ tên và tự gửi. Mỗi máy giữ một dòng điểm cao nhất cho mỗi chế độ và mốc thời gian (định danh bằng mã ngẫu nhiên trong `localStorage`, không cần đăng nhập).
 
-Điểm tính ở trình duyệt nên không chặn gian lận tuyệt đối được, server chỉ làm khó hơn:
+Điểm tính ở trình duyệt nên không chặn gian lận tuyệt đối được, server chỉ làm khó hơn (`backend/src/app/services/anticheat.py`, `routers/scores.py`):
 
-- Lúc bắt đầu ván, server cấp token ký HMAC ghi lại thời điểm. Nộp điểm sớm hơn thời lượng ván (hoặc số giây sống sót) là bị từ chối.
-- Single/double: tối đa 12 nhát/giây mỗi tay. Random: tối đa 300 giây, và số nhát phải đủ bù lượng Lửa đã cạn.
-- Giới hạn số request theo IP.
+- Lúc bắt đầu ván, server cấp token ký HMAC ghi lại thời điểm. Nộp điểm sớm hơn thời lượng ván (hoặc số giây sống sót), hoặc trễ quá 15 phút sau khi hết ván, là bị từ chối.
+- Mỗi token chỉ dùng cho một ván (bảng `runs`). Nộp lại cùng token chỉ để đổi tên, phải cùng máy và cùng điểm.
+- Client gửi kèm số nhát từng giây, FPS nhận diện và tỉ lệ bám trụ. Server đối chiếu: tổng từng giây phải khớp tổng nhát, trung bình tối đa 8 nhát/giây mỗi tay, giây nào cũng tối đa 10 nhát mỗi tay và không nhanh hơn FPS cho phép, số nhát phải tương xứng với thời gian bám trụ, nhịp đều tăm tắp như máy bị loại. Random: dựng lại thanh Lửa theo từng giây, Lửa đã cạn trước lúc thua là bịa.
+- Cloudflare Turnstile xác minh người thật khi gửi điểm (thường chạy ngầm, chỉ hiện ô tick khi nghi ngờ), cộng giới hạn request theo IP.
 
-API (`worker/src/index.js`):
+Xem các ván đã nộp (số liệu từng ván nằm ở cột `detail`) và gỡ điểm đáng ngờ:
+
+```bash
+cd backend
+uv run pywrangler d1 execute ambatukam-leaderboard --remote --command "SELECT r.*, s.name FROM runs r LEFT JOIN scores s USING (pid, mode, duration) ORDER BY r.created_at DESC LIMIT 20"
+uv run pywrangler d1 execute ambatukam-leaderboard --remote --command "DELETE FROM scores WHERE pid = '<pid>'"
+```
+
+API (`backend/src/app/routers/`, tài liệu OpenAPI ở `/api/docs`):
 
 | Endpoint | Việc |
 |---|---|
 | `POST /api/session` `{ mode, duration }` | Cấp token cho ván mới |
-| `POST /api/score` `{ token, pid, name, strokes, survived? }` | Nộp điểm, trả về hạng hiện tại |
+| `POST /api/score` `{ token, captcha, pid, name, strokes, survived?, bins, fps, grip, split? }` | Nộp điểm, trả về hạng hiện tại |
 | `GET /api/leaderboard?mode=&duration=&pid=` | Top 50 và hạng của người chơi |
 
 ## Cách chơi
@@ -83,9 +83,7 @@ API (`worker/src/index.js`):
 2. **Xòe bàn tay**, giữ 1 giây → sẵn sàng.
 3. **Nắm tay như cầm trụ**, giữ yên 1 giây → game đặt **điểm neo** và vẽ thanh trụ ảo tại đó, nghiêng theo đúng hướng tay bạn đang nắm. (Double: cả hai tay cùng nắm. Random: bỏ qua bước này, trụ tự hiện.)
 4. Đếm ngược 3-2-1, rồi **xóc lên xuống dọc theo trụ**. Chỉ những nhát đúng tư thế (tay nắm, nằm trong vùng trụ) mới được tính.
-5. Hết giờ (hoặc hết Lửa): xem tốc độ trung bình / số giây sống sót, tổng nhát, đỉnh, biểu đồ từng giây. **Xòe tay 1 giây** để chơi lại, hoặc bấm **Lưu ảnh** để tải ảnh kết quả 1080×1080.
-
-Không có camera? Chế độ single có thể chơi bằng phím `↑` `↓` (hoặc chạm nửa trên / nửa dưới khung hình).
+5. Hết giờ (hoặc hết Lửa): popup hiện tốc độ trung bình / số giây sống sót, danh hiệu, tổng nhát, kỷ lục, và ô gửi điểm lên bảng xếp hạng. **Xòe tay 1 giây** để chơi lại, hoặc bấm **Lưu ảnh** để tải ảnh kết quả 1080×1080.
 
 ![Đang chơi](docs/play.png)
 ![Kết quả](docs/result.png)
@@ -110,30 +108,27 @@ Mỗi khung hình, MediaPipe trả về 21 điểm khớp của bàn tay. Game t
 
 Xóc nhanh làm tay bị nhòe và mô hình mất dấu vài khung. Trong 0.4 giây game giữ trạng thái gần nhất thay vì phạt; mất lâu hơn thì trụ chuyển xám và nhắc thêm ánh sáng.
 
-Tất cả tham số nằm ở đầu `game.js`, có chú thích từng dòng.
+Tất cả tham số nằm ở `frontend/src/game/constants.ts`, có chú thích từng dòng.
 
 ## Cấu trúc
 
 ```
-index.html         Khung trang + các màn hình (start / ready / countdown / HUD / result / board)
-style.css          Giao diện: đen trắng, một màu nhấn, không gradient
-game.js            Toàn bộ logic: i18n, nhận diện tay, đếm nhát, vẽ overlay, chia sẻ, bảng xếp hạng
-worker/src/        API bảng xếp hạng (Cloudflare Worker)
-worker/schema.sql  Bảng D1
-wrangler.jsonc     Cấu hình Worker: phục vụ file tĩnh + /api/*
-.assetsignore      File không được phục vụ ra ngoài
-docs/              Ảnh chụp màn hình
+frontend/   React + TypeScript (Vite). src/game là engine nhận diện tay, src/components là giao diện
+backend/    FastAPI trên Cloudflare Python Workers: API bảng xếp hạng, chống gian lận, D1 migrations
+docs/       Ảnh chụp màn hình
+Makefile    Lệnh hay dùng: install, dev-api, dev-web, test, lint, build, deploy
+AGENTS.md   Chi tiết cấu trúc, biến môi trường, quy ước, deploy
 ```
 
-Không có bước build. Thư viện MediaPipe và mô hình tải từ CDN lúc chạy.
+Thư viện MediaPipe đi kèm bundle, WASM và mô hình tải từ CDN lúc chạy.
 
 ## Ngôn ngữ
 
-Có tiếng Việt và tiếng Anh, chuyển bằng nút VI / EN. Toàn bộ chuỗi nằm trong `STRINGS` ở đầu `game.js`; thêm ngôn ngữ mới = thêm một key.
+Có tiếng Việt và tiếng Anh, chuyển bằng nút VI / EN. Chuỗi nằm ở `frontend/src/i18n/strings.ts`; thêm ngôn ngữ mới = thêm một object cùng kiểu `Strings`.
 
 ## Debug
 
-Mở `http://localhost:5173/?debug` để có `window.__amb` (bơm dữ liệu tay giả vào `processFrame`, `setMode`, đọc `state`, `count`, `counts`, `anchors`, `onRod`, `meter`, `rods`).
+Khi chạy `make dev-web`, mở `http://localhost:5173/?debug` để có dòng chẩn đoán và `window.__amb` (bơm dữ liệu tay giả vào `processFrame`, `fakeHand`, `setMode`, đọc `phase`, `count`, `counts`, `anchors`, `onRod`, `meter`, `rods`).
 
 Nhảy thẳng tới một màn hình để xem giao diện, thêm `mode=single|double|random`:
 
@@ -160,10 +155,12 @@ Hand tracking runs entirely in the browser; video never leaves the device. The o
 
 **Play online:** https://ambatukam.bahao.site
 
-**Run locally:** any static server works, e.g. `python3 -m http.server 5173`, then open http://localhost:5173. Camera access requires `localhost` or HTTPS. For the leaderboard, run the game and API together with `npx wrangler dev` (see the Vietnamese section above for setup and deploy).
+**Stack:** React + TypeScript (Vite) in `frontend/`, FastAPI on Cloudflare Python Workers + D1 in `backend/`, served from one Worker.
 
-**Leaderboard:** after a camera run, enter a name on the result screen to submit. One best score per device per mode/duration. Keyboard runs aren't ranked. The server signs a session token at the start of each run and rejects scores submitted faster than the run could take or beyond human limits.
+**Run locally:** needs Node 22+ and uv ≥ 0.13.4. `make install`, copy `backend/.dev.vars.example` to `backend/.dev.vars`, `make migrate-local`, then `make dev-api` and `make dev-web` and open http://localhost:5173. Camera access requires `localhost` or HTTPS. Env vars, secrets, conventions and deploy are documented in [AGENTS.md](AGENTS.md).
 
-**Play:** pick a mode and duration → open palm 1s to get ready → grip and hold still 1s to set the anchor (both hands in Double; skipped in Random) → stroke along the virtual rod. Only strokes made while gripping inside the rod zone count. Open palm again to replay. Keyboard mode (`↑` `↓`) is available without a camera.
+**Leaderboard:** when a run ends, a result popup shows your score and a name field to submit it, then your rank. One best score per device per mode/duration. Scores are computed in the browser, so the server makes cheating harder rather than impossible: a one-time HMAC session token per run, a submit window, per-second stroke counts checked against the total, the camera frame rate, time spent on the rod and human limits (8 strokes/s per hand on average), a replay of the Heat meter in Random, Cloudflare Turnstile, and per-IP rate limits.
 
-Switch language with the VI / EN toggle. All tuning constants are documented at the top of `game.js`.
+**Play:** pick a mode and duration → open palm 1s to get ready → grip and hold still 1s to set the anchor (both hands in Double; skipped in Random) → stroke along the virtual rod. Only strokes made while gripping inside the rod zone count. Open palm again to replay.
+
+Switch language with the VI / EN toggle. All tuning constants are documented in `frontend/src/game/constants.ts`.

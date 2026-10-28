@@ -1,0 +1,129 @@
+# AGENTS.md
+
+Hướng dẫn cho người (và AI agent) sửa repo này. Đọc hết trước khi đụng vào code.
+
+## Tổng quan
+
+Game webcam: nhận diện tay chạy hoàn toàn trong trình duyệt (MediaPipe), backend chỉ lo bảng xếp hạng.
+
+Monorepo một git repo: `frontend/` (Node, npm) và `backend/` (Python, uv), mỗi bên giữ lockfile của mình (`frontend/package-lock.json`, `backend/uv.lock`).
+Lệnh chung chạy từ gốc qua `Makefile`. Chỉ có một `.gitignore` ở gốc, đừng tạo `.gitignore` trong thư mục con.
+Cả hai chạy trên **một Cloudflare Worker** ở https://ambatukam.bahao.site:
+
+- File tĩnh (`frontend/dist`) do Workers Static Assets phục vụ.
+- `/api/*` đi vào FastAPI chạy trên Cloudflare Python Workers (`run_worker_first`), lưu điểm ở D1.
+
+```
+frontend/                React 19 + TypeScript + Vite
+  src/game/              Engine thuần TS (không React, không i18n): nhận diện tay, đếm nhát, vẽ canvas
+  src/components/        Component React, mỗi component một file .css riêng nếu cần
+  src/hooks/             useGameEngine, useStore (đọc Store của engine), useScoreSubmission
+  src/api/               Client gọi /api, kiểu dữ liệu khớp backend/src/app/schemas.py
+  src/i18n/              Chuỗi vi/en, provider, <Rich> (**đậm**)
+  src/lib/               storage (localStorage), scoring, share (ảnh kết quả), turnstile
+  src/styles/global.css  Token màu, nút, layout chung
+  public/                favicon, icon, og.png, site.webmanifest (copy nguyên vào dist)
+  brand/, scripts/       Nguồn og.svg và script dựng icon (`npm run brand`)
+backend/                 FastAPI trên Cloudflare Python Workers (quản lý bằng uv + pywrangler)
+  src/entry.py           WorkerEntrypoint → ASGI
+  src/app/main.py        create_app(): router, error handler, /api/docs
+  src/app/routers/       sessions, scores, leaderboard
+  src/app/services/      tokens (HMAC), anticheat, turnstile, names
+  src/app/db.py          ScoreRepository trên D1
+  src/app/rules.py       Hằng số luật chơi / chống gian lận
+  migrations/            D1 migrations (đánh số 000N_*.sql)
+  tests/                 pytest: D1 giả bằng sqlite3, đồng hồ giả, captcha giả
+  wrangler.jsonc         Cấu hình Worker (assets, D1, rate limit, domain)
+```
+
+Engine ↔ React: `GameEngine` có các `Store` (`ui`, `hud`, `diagText`). React đọc qua `useStore` (`useSyncExternalStore`).
+Engine chỉ phát ra **khoá chuỗi** (`gPalmReady`, `sLost`…), React dịch. Engine báo sự kiện qua `setHandlers({ onPlayStart, onFinish })`.
+
+## Biến môi trường và secret
+
+**Frontend (Vite, build-time, CÔNG KHAI).** Mọi biến `VITE_*` bị nhúng vào bundle JS, ai cũng đọc được.
+
+| Biến | Ở đâu | Ghi chú |
+|---|---|---|
+| `VITE_TURNSTILE_SITE_KEY` | `frontend/.env.development` (khoá thử), `frontend/.env.production` (khoá thật) | Bắt buộc. Thiếu thì trang báo lỗi ngay (`src/config.ts`) |
+| `VITE_API_BASE_URL` | để trống | Trống = cùng tên miền. Dev dùng proxy của Vite |
+
+`.env.development` / `.env.production` được commit vì chỉ chứa giá trị công khai. Ghi đè trên máy mình bằng `*.local` (đã gitignore). Mẫu và giải thích ở `frontend/.env.example`.
+Khi thêm biến mới: thêm vào `.env.example`, khai báo kiểu trong `src/vite-env.d.ts`, đọc qua `src/config.ts` (không gọi `import.meta.env` rải rác).
+
+**Backend (secret của Worker, KHÔNG BAO GIỜ commit).**
+
+| Secret | Production | Local |
+|---|---|---|
+| `TOKEN_SECRET` | `cd backend && openssl rand -hex 32 \| uv run pywrangler secret put TOKEN_SECRET` | `backend/.dev.vars` |
+| `TURNSTILE_SECRET` | `cd backend && uv run pywrangler secret put TURNSTILE_SECRET` (Cloudflare dashboard → Turnstile → widget) | `backend/.dev.vars` (khoá thử `1x0000000000000000000000000000000AA`) |
+
+`backend/.dev.vars` đã gitignore; tạo từ `backend/.dev.vars.example`. Đọc secret qua `Settings.from_env` (`src/app/config.py`), thiếu thì lỗi 500 rõ ràng.
+Không in secret ra log, không dán vào issue/PR.
+
+Khoá Turnstile thử của Cloudflare (luôn qua): sitekey `1x00000000000000000000AA`, secret `1x0000000000000000000000000000000AA`.
+Sitekey thật và secret thật phải cùng một widget, và widget phải cho phép hostname `ambatukam.bahao.site`.
+
+## Chạy local
+
+Cần Node 22+ và [uv](https://docs.astral.sh/uv/) ≥ 0.13.4 (pywrangler đòi bản này).
+
+```bash
+make install                       # npm ci (frontend) + uv sync (backend)
+cp backend/.dev.vars.example backend/.dev.vars
+make migrate-local                 # tạo bảng trong D1 local (lần đầu, hoặc khi có migration mới)
+make dev-api                       # Worker thật trên http://localhost:8787 (API + dist)
+make dev-web                       # Vite trên http://localhost:5173, /api proxy sang 8787
+```
+
+API chạy port khác thì đặt `API_DEV_URL=http://localhost:8788` trong `frontend/.env.development.local` (hoặc `API_DEV_URL=… make dev-web`). Tài liệu API: http://localhost:8787/api/docs.
+
+Trước khi commit: `make lint test build` phải xanh.
+
+## Debug
+
+Chỉ có khi chạy `vite dev` (bị loại khỏi bản build):
+
+- `?debug`: hiện dòng chẩn đoán (delegate, fps, số tay) và `window.__amb` (`processFrame`, `fakeHand`, `useFakeCamera`, `setMode`, đọc `phase`, `count`, `counts`, `anchors`, `onRod`, `meter`, `rods`).
+- `?debug&auto=result&mode=double&lang=vi`: nhảy thẳng tới popup kết quả. `auto=play` để xem HUD đang chơi.
+- `?delegate=CPU|GPU` ép delegate MediaPipe; `?mode=`, `?lang=` chọn sẵn chế độ / ngôn ngữ.
+
+Chrome headless không có WebGL thì MediaPipe lỗi (`activeTexture`); chạy với `--use-angle=swiftshader --enable-unsafe-swiftshader`.
+
+## Những thứ phải giữ đồng bộ
+
+- `RND_METER_START / RND_DRAIN_BASE / RND_DRAIN_RAMP / RND_STROKE_GAIN` ở `frontend/src/game/constants.ts` ↔ `RND_START / RND_DRAIN / RND_RAMP / RND_GAIN` ở `backend/src/app/rules.py` (server dựng lại thanh Lửa để kiểm tra).
+- Kiểu trong `frontend/src/api/types.ts` ↔ `backend/src/app/schemas.py`; mã lỗi `REJECTED_CODES` ↔ các `ApiError(...)` trong `routers/scores.py`.
+- Tên khoá localStorage trong `frontend/src/lib/storage.ts`: đổi là người chơi mất kỷ lục và mã người chơi.
+- Phiên bản `@mediapipe/tasks-vision` trong `package.json` (ghim cứng) ↔ `MEDIAPIPE_VERSION` ở `src/game/landmarker.ts` (WASM tải từ CDN theo phiên bản này).
+- Đổi luật / ngưỡng chống gian lận: sửa `rules.py` + test trong `backend/tests/`, cập nhật mục chống gian lận trong README.
+
+## Quy ước code
+
+- Comment và chuỗi giao diện viết tiếng Việt (chuỗi người dùng thấy có cả `vi` và `en` trong `src/i18n/strings.ts`, không hardcode trong component).
+- Frontend: TypeScript strict, function component + hooks, không thêm thư viện state/UI. CSS thuần, dùng biến trong `global.css`. Lint bằng oxlint, test bằng vitest (`*.test.ts` cạnh file nguồn).
+- Engine (`src/game/`) không import React hay i18n.
+- Backend: router mỏng, logic ở `services/`, truy cập D1 chỉ qua `ScoreRepository`. Phụ thuộc (env, settings, repo, captcha, rate limit) đi qua `Depends` để test thay được. Lỗi trả về dạng `{"error": "<code>"}` qua `ApiError`. Ruff (line 110) + pytest.
+- Đổi schema D1: thêm file migration mới `backend/migrations/000N_*.sql`, không sửa migration đã chạy.
+- Không thu thập IP / quốc gia người chơi cho chống gian lận (IP chỉ dùng làm khoá rate limit, không lưu).
+
+## Deploy
+
+Workers Builds (Cloudflare dashboard → Workers → ambatukam → Settings → Build) tự deploy khi push lên `main`. Cấu hình:
+
+| Mục | Giá trị |
+|---|---|
+| Root directory | `/` |
+| Build command | `npm ci --prefix frontend && npm run build --prefix frontend` |
+| Deploy command | `cd backend && uv run pywrangler d1 migrations apply ambatukam-leaderboard --remote && uv run pywrangler deploy` |
+
+GitHub Actions (`.github/workflows/ci.yml`) chỉ kiểm tra: typecheck, lint, test, build, ruff, pytest, `pywrangler deploy --dry-run`. Không cần GitHub secret nào.
+
+Checklist khi deploy thay đổi lớn:
+
+1. `make lint test build` xanh.
+2. Có migration mới: `make migrate-remote` (hoặc để deploy command lo). Migration phải chạy lại được an toàn (`IF NOT EXISTS`).
+3. Có secret mới: `uv run pywrangler secret put <NAME>` trong `backend/` trước khi deploy.
+4. Đổi widget Turnstile: cập nhật `frontend/.env.production` và secret `TURNSTILE_SECRET` cùng lúc.
+5. Bundle Worker (gzip) phải dưới 3 MB của gói free; `pywrangler deploy --dry-run` in ra kích thước.
+6. Sau deploy: mở trang, chơi một ván, gửi điểm, xem bảng xếp hạng.

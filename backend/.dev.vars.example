@@ -1,0 +1,10 @@
+# Biến môi trường khi chạy local (`uv run pywrangler dev`). Copy thành .dev.vars (đã gitignore):
+#   cp .dev.vars.example .dev.vars
+# Production đặt bằng `uv run pywrangler secret put <NAME>`, KHÔNG commit giá trị thật.
+
+# Khoá ký token phiên chơi (HMAC-SHA256). Local đặt gì cũng được.
+TOKEN_SECRET=dev-only-change-me
+
+# Khoá bí mật Turnstile. Đây là khoá thử của Cloudflare, luôn xác minh thành công:
+# https://developers.cloudflare.com/turnstile/troubleshooting/testing/
+TURNSTILE_SECRET=1x0000000000000000000000000000000AA
