@@ -1,6 +1,43 @@
+# Monorepo: frontend/ (React + Vite) và backend/ (FastAPI trên Cloudflare Python Workers).
+# Một file ignore cho cả repo.
+
+# Hệ điều hành / editor
 .DS_Store
-node_modules/
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+
+# Log, file tạm
 *.log
 _debug/
-.wrangler/
+
+# Env và secret: KHÔNG commit file env nào, chỉ commit file *.example.
+# Production: frontend lấy biến lúc build từ Cloudflare Build variables, backend lấy secret từ Worker secrets.
+.env
+.env.*
+*.local
 .dev.vars
+.dev.vars.*
+!*.example
+
+# Wrangler local state (D1 local, cache)
+.wrangler/
+
+# Frontend (Node / Vite)
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Backend (Python / uv / pywrangler)
+__pycache__/
+.venv/
+.venv-workers/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+python_modules/
+pylock.toml

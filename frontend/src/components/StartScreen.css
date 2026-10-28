@@ -1,0 +1,23 @@
+/* Chọn chế độ */
+.modes { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.modes button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 128px; padding: 10px 12px; text-align: left; }
+.modes button b { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; }
+.modes button span { font-size: 11px; color: var(--mute); line-height: 1.3; }
+.modes button.active { border-color: var(--fg); background: var(--fg); color: var(--bg); }
+.modes button.active span { color: var(--bg); opacity: .7; }
+.modes button:disabled { opacity: .45; }
+.modes button:disabled span { text-transform: uppercase; letter-spacing: .08em; font-size: 10px; }
+
+.sub { color: var(--mute); margin: 0; max-width: 46ch; }
+/* Mô tả chế độ luôn chiếm 3 dòng, dòng kỷ lục giữ chỗ dù rỗng: đổi chế độ không nhảy layout */
+.screen-start .sub { min-height: calc(3 * 1.5em); display: flex; align-items: center; }
+.screen-start .best { min-height: 1.5em; }
+.fine { color: var(--mute); font-size: 12px; margin: 8px 0 0; max-width: 52ch; }
+
+@media (max-width: 640px) {
+  .modes { display: grid; grid-template-columns: repeat(3, 1fr); width: 100%; max-width: 360px; }
+  .modes button { width: auto; padding: 8px 10px; }
+  .modes button:not(:disabled) span { display: none; } /* mô tả chế độ đã có ở đoạn bên dưới */
+  .sub { font-size: 14px; }
+  .fine { font-size: 11px; margin-top: 0; }
+}

@@ -1,0 +1,18 @@
+.screen-board { justify-content: flex-start; }
+.board {
+  list-style: none; margin: 0; padding: 0;
+  width: min(460px, 100%); flex: 1 1 0; min-height: 0; overflow-y: auto;
+  border-top: 1px solid var(--line);
+}
+.board li {
+  display: grid; grid-template-columns: 3ch minmax(0, 1fr) auto 9ch; gap: 12px; align-items: baseline;
+  padding: 7px 8px; border-bottom: 1px solid var(--line); text-align: left;
+}
+.board .rk { font-family: var(--mono); color: var(--mute); text-align: right; }
+.board li:nth-child(-n+3) .rk { color: var(--accent); font-weight: 700; }
+.board .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.board .sc { font-family: var(--mono); font-weight: 700; font-variant-numeric: tabular-nums; }
+.board .ct { font-family: var(--mono); font-size: 12px; color: var(--mute); text-align: right; }
+.board li.me { background: var(--fg); color: var(--bg); }
+.board li.me .rk, .board li.me .ct { color: var(--bg); }
+.board li.note { display: block; color: var(--mute); text-align: center; padding: 24px 8px; border: 0; }

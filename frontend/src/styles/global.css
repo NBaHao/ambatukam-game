@@ -1,0 +1,160 @@
+:root {
+  --bg: #0b0b0b;
+  --fg: #f2f2f2;
+  --mute: #8b8b8b;
+  --line: #2a2a2a;
+  --panel: #121212;
+  --accent: #ff3b3b;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --cam-aspect: 1.3333; /* tỉ lệ khung camera, engine cập nhật theo video thật */
+  --chrome: 88px;       /* chiều cao header + lề, để khung camera vừa một màn hình */
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+#root { display: flex; flex-direction: column; min-height: 100vh; }
+
+.hidden { display: none !important; }
+.ghost { visibility: hidden; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+b { font-weight: 700; }
+h1 { margin: 0; font-size: 34px; font-weight: 800; letter-spacing: -.01em; }
+h2 { margin: 0; font-size: 24px; font-weight: 800; }
+
+/* ---------- Nút ---------- */
+button {
+  font: inherit;
+  color: var(--fg);
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+button:hover:not(:disabled) { border-color: var(--fg); }
+button:disabled { opacity: .4; cursor: default; }
+
+.btn {
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 12px 22px;
+}
+.btn.primary { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.btn.primary:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+.link { border: none; color: var(--mute); padding: 6px; text-decoration: underline; text-underline-offset: 3px; }
+.link:hover { color: var(--fg); }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; }
+
+/* Nhóm nút chọn một (thời lượng, chế độ trên bảng xếp hạng) */
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; font-family: var(--mono); padding: 8px 16px; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button.active { background: var(--fg); color: var(--bg); }
+/* Hover chỉ đổi nền, giữ nguyên vạch ngăn (không ăn theo viền trắng của button:hover chung) */
+.seg button:hover:not(:disabled) { border-color: var(--line); background: rgba(242, 242, 242, .08); }
+.seg button.active:hover:not(:disabled) { background: #d4d4d4; }
+
+/* ---------- Header ---------- */
+.top {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px;
+  max-width: 960px; width: 100%; margin: 0 auto;
+}
+.logo { font-weight: 800; letter-spacing: .12em; font-size: 15px; }
+.logo::before { content: ""; display: inline-block; width: 10px; height: 10px; background: var(--accent); margin-right: 10px; }
+.lang { display: flex; gap: 2px; }
+.lang button { font-size: 12px; padding: 4px 8px; border: none; color: var(--mute); font-family: var(--mono); }
+.lang button.active { color: var(--fg); text-decoration: underline; text-underline-offset: 4px; }
+
+/* ---------- Sân khấu ---------- */
+.stage {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 840px) 56px;
+  gap: 12px;
+  justify-content: center;
+  align-content: start;
+  align-items: start;
+  padding: 0 20px 20px;
+}
+
+.cam-wrap {
+  position: relative;
+  justify-self: center;
+  width: min(100%, calc((100vh - var(--chrome)) * var(--cam-aspect)));
+  width: min(100%, calc((100dvh - var(--chrome)) * var(--cam-aspect)));
+  aspect-ratio: var(--cam-aspect);
+  touch-action: manipulation;
+  background: #000;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.cam-video, .cam-overlay {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1); /* gương */
+}
+
+.screen {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 14px;
+  text-align: center;
+  padding: 24px;
+  background: rgba(11, 11, 11, .92);
+}
+.screen.clear { background: transparent; }
+/* Nội dung dài hơn khung thì cuộn; margin auto giữ nội dung ở giữa khi còn chỗ */
+.screen:not(.clear) { justify-content: flex-start; overflow-y: auto; }
+.screen:not(.clear) > :first-child { margin-top: auto; }
+.screen:not(.clear) > :last-child { margin-bottom: auto; }
+.screen:not(.clear) > :not(.board) { flex-shrink: 0; }
+
+.best { margin: 0; font-family: var(--mono); font-size: 13px; color: var(--mute); }
+.best:empty:not(.best-line) { display: none; }
+
+/* Chuẩn bị: thẻ thông báo mở camera / tải mô hình */
+.screen-ready { justify-content: flex-end; }
+.card {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  background: rgba(11, 11, 11, .88); border: 1px solid var(--line); border-radius: 6px;
+  padding: 14px 18px; width: 100%; max-width: 400px;
+}
+.hint { margin: 0; color: var(--mute); }
+
+.countdown { font-family: var(--mono); font-size: 140px; font-weight: 700; line-height: 1; animation: pop .8s ease-out; }
+@keyframes pop { from { transform: scale(1.25); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* Dòng chẩn đoán khi mở ?debug */
+.diag {
+  position: fixed; left: 8px; bottom: 8px; z-index: 50; margin: 0; pointer-events: none;
+  font: 11px/1.4 var(--mono); color: var(--fg); background: rgba(0, 0, 0, .8);
+  padding: 4px 8px; border-radius: 4px; white-space: pre-wrap; max-width: calc(100vw - 16px);
+}
+
+@media (max-width: 640px) {
+  :root { --cam-aspect: 0.75; --chrome: 124px; }
+  .top { padding: 12px 14px; }
+  .stage { grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 0 12px 12px; }
+  .screen { padding: 16px 14px; gap: 10px; }
+  .btn { padding: 10px 16px; }
+  h1 { font-size: 22px; }
+  h2 { font-size: 20px; }
+  .countdown { font-size: 100px; }
+}

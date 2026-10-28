@@ -1,0 +1,24 @@
+/* Thanh lực (nhát/giây) hoặc Lửa (random) cạnh khung camera; điện thoại thì nằm ngang bên dưới */
+.power {
+  align-self: stretch;
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: 12px 0;
+}
+.power-label, .power-value small { font-size: 10px; text-transform: uppercase; letter-spacing: .12em; color: var(--mute); }
+.power-bar {
+  position: relative; flex: 1; width: 10px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 2px; overflow: hidden;
+}
+.power-fill { position: absolute; left: 0; right: 0; bottom: 0; height: var(--pct, 0%); background: var(--fg); transition: height .08s linear; }
+.power-bar.maxed .power-fill, .power-bar.low .power-fill { background: var(--accent); }
+.power-hand { position: absolute; left: 0; right: 0; height: 2px; top: 50%; background: var(--accent); opacity: 0; }
+.power-hand.on { opacity: 1; }
+.power-value { font-family: var(--mono); font-size: 16px; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
+.power-value small { display: block; font-family: var(--sans); font-weight: 400; }
+
+@media (max-width: 640px) {
+  .power { flex-direction: row; padding: 0; gap: 12px; }
+  .power-bar { width: auto; height: 10px; }
+  .power-fill { left: 0; right: auto; top: 0; bottom: 0; width: var(--pct, 0%); height: 100%; }
+  .power-hand { display: none; }
+}

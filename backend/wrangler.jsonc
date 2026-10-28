@@ -1,0 +1,33 @@
+// Một Worker phục vụ cả game (React build ở ../frontend/dist) lẫn API leaderboard FastAPI (/api/*).
+// /api/* luôn chạy vào Python (src/entry.py); đường dẫn khác trả file tĩnh nếu có.
+// Chạy qua pywrangler (uv run pywrangler dev|deploy) để nó đóng gói thư viện Python trong pyproject.toml.
+{
+  "name": "ambatukam",
+  "main": "src/entry.py",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["python_workers"],
+  "assets": {
+    "directory": "../frontend/dist",
+    "run_worker_first": ["/api/*"]
+  },
+  // Tên miền riêng: Cloudflare tự tạo bản ghi DNS + chứng chỉ SSL khi deploy (zone bahao.site nằm trên Cloudflare).
+  "routes": [{ "pattern": "ambatukam.bahao.site", "custom_domain": true }],
+  // Chỉ phục vụ qua tên miền riêng: tắt link *.workers.dev và link xem trước của từng phiên bản
+  "workers_dev": false,
+  "preview_urls": false,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "ambatukam-leaderboard",
+      "database_id": "2a050a93-08f2-4d52-b193-e340203002ca",
+      "migrations_dir": "migrations"
+    }
+  ],
+  // Giới hạn số request theo IP (period chỉ được 10 hoặc 60 giây)
+  "ratelimits": [
+    { "name": "SESSION_LIMIT", "namespace_id": "1001", "simple": { "limit": 30, "period": 60 } },
+    { "name": "SCORE_LIMIT", "namespace_id": "1002", "simple": { "limit": 10, "period": 60 } }
+  ]
+  // Secret (không ghi ở đây): TOKEN_SECRET, TURNSTILE_SECRET.
+  // Production: `uv run pywrangler secret put <NAME>`. Local: backend/.dev.vars (mẫu trong .dev.vars.example).
+}

@@ -1,0 +1,29 @@
+[project]
+name = "ambatukam-api"
+version = "1.0.0"
+description = "Leaderboard API for Ambatukam Game: FastAPI on Cloudflare Python Workers + D1"
+requires-python = ">=3.12"
+# Chỉ thư viện trong mục này được pywrangler đóng gói lên Worker
+dependencies = ["fastapi>=0.115"]
+
+[dependency-groups]
+dev = [
+  "workers-py",          # pywrangler: dev / deploy / sync
+  "workers-runtime-sdk", # type stub cho module `workers`, `js`
+  "pytest>=8",
+  "httpx2>=2.16.0",      # cho fastapi.testclient
+  "ruff>=0.8",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+src = ["src", "tests"]
+exclude = ["python_modules", ".venv-workers"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]

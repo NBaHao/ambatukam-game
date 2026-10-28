@@ -1,0 +1,50 @@
+/* Popup kết quả mở khi hết ván, đè lên khung camera. Điện thoại: tấm trượt từ đáy, gần ngón cái. */
+.result {
+  width: min(360px, calc(100vw - 24px)); max-height: calc(100dvh - 24px);
+  padding: 28px 24px 24px; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--bg); color: var(--fg); text-align: center;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, .6);
+}
+.result[open] { display: flex; flex-direction: column; align-items: center; gap: 8px; animation: dlg-in .18s ease-out; }
+.result::backdrop { background: rgba(0, 0, 0, .55); backdrop-filter: blur(2px); }
+@keyframes dlg-in { from { opacity: 0; transform: translateY(12px) scale(.98); } }
+@media (prefers-reduced-motion: reduce) { .result[open] { animation: none; } }
+
+.res-close { position: absolute; top: 8px; right: 8px; border: 0; color: var(--mute); font-size: 16px; line-height: 1; padding: 8px; }
+.res-close:hover { color: var(--fg); }
+.res-mode { margin: 0; font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--mute); }
+.res-hero { display: flex; flex-direction: column; align-items: center; }
+.res-num { font-family: var(--mono); font-size: 84px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.res-unit { color: var(--mute); font-size: 12px; text-transform: uppercase; letter-spacing: .1em; margin-top: 6px; }
+.result h2 { font-size: 20px; }
+.res-meta { margin: 0; font-family: var(--mono); font-size: 13px; color: var(--mute); }
+
+/* Gửi điểm lên bảng xếp hạng */
+.rank {
+  align-self: stretch; display: flex; flex-direction: column; align-items: center; gap: 8px;
+  border-top: 1px solid var(--line); padding-top: 18px; margin-top: 10px;
+}
+.submit-form { display: flex; gap: 6px; width: 100%; }
+.submit-form input {
+  flex: 1; min-width: 0;
+  font: inherit; font-size: 16px; /* 16px để Safari iOS không tự phóng to khi gõ */
+  color: var(--fg); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 4px; padding: 9px 12px;
+}
+.submit-form input:focus-visible { outline: none; border-color: var(--fg); }
+.submit-form .btn { padding: 10px 16px; }
+.submit-msg { margin: 0; font-family: var(--mono); font-size: 13px; }
+.submit-msg:empty { display: none; }
+.turnstile:empty { display: none; }
+.links { gap: 2px 12px; }
+
+.res-actions { align-self: stretch; margin-top: 10px; flex-wrap: nowrap; }
+.res-actions .btn { flex: 1; }
+.btn-again { position: relative; overflow: hidden; }
+/* Tiến độ "xòe tay để chơi lại": popup che mất thanh cử chỉ trên khung camera */
+.replay-fill { position: absolute; left: 0; bottom: 0; height: 3px; width: 0; background: var(--accent); }
+
+@media (max-width: 640px) {
+  .result { width: 100%; max-width: none; margin: auto 0 0; border-radius: 14px 14px 0 0; border-bottom: 0; padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
+  .res-num { font-size: 56px; }
+}
