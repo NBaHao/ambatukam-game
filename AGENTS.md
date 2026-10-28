@@ -204,7 +204,11 @@ Workers Builds (Cloudflare dashboard → Workers → ambatukam → Settings → 
 | Root directory | `/` |
 | Build command | `npm ci --prefix frontend && npm run build --prefix frontend` |
 | Build variables | `VITE_TURNSTILE_SITE_KEY` = sitekey thật của widget Turnstile |
-| Deploy command | `cd backend && uv run pywrangler d1 migrations apply ambatukam-leaderboard --remote && uv run pywrangler deploy` |
+| Deploy command | `backend/scripts/deploy.sh` |
+
+`backend/scripts/deploy.sh` áp các migration D1 chưa chạy rồi mới deploy Worker (`make deploy` cũng gọi script này).
+Đổi cách deploy thì sửa script trong repo, đừng sửa deploy command trên Cloudflare.
+API token của Workers Builds phải có quyền **D1 Edit**, nếu không bước migration lỗi và build dừng trước khi deploy.
 
 Worker secrets (`TOKEN_SECRET`, `TURNSTILE_SECRET`) nằm ở Settings → Variables and secrets (runtime), khác với Build variables ở trên.
 
@@ -219,7 +223,9 @@ GitHub Actions (`.github/workflows/ci.yml`) chỉ kiểm tra: typecheck, lint, t
 Checklist khi deploy thay đổi lớn:
 
 1. `make lint test build` xanh.
-2. Có migration mới: `make migrate-remote` (hoặc để deploy command lo). Migration phải chạy lại được an toàn (`IF NOT EXISTS`).
+2. Có migration mới: chỉ cần thêm file `backend/migrations/000N_*.sql`, deploy tự áp (muốn áp trước thì `make migrate-remote`).
+   Migration chạy trước code mới, nên code cũ phải chạy được trên schema mới: chỉ thêm bảng / cột (có default),
+   xoá hay đổi tên thì tách sang PR sau, khi không còn code nào dùng nữa. Dùng `IF NOT EXISTS` để chạy lại an toàn.
 3. Có secret mới: `uv run pywrangler secret put <NAME>` trong `backend/` trước khi deploy.
 4. Đổi widget Turnstile: cập nhật Build variable `VITE_TURNSTILE_SITE_KEY` và Worker secret `TURNSTILE_SECRET` cùng lúc.
 5. Bundle Worker (gzip) phải dưới 3 MB của gói free; `pywrangler deploy --dry-run` in ra kích thước.
