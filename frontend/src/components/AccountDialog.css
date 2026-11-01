@@ -1,0 +1,28 @@
+/* Hộp tài khoản (username → đăng nhập / đăng ký), cùng kiểu với popup kết quả */
+.account {
+  width: min(340px, calc(100vw - 24px)); max-height: calc(100dvh - 24px);
+  padding: 28px 24px 20px; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--bg); color: var(--fg); text-align: center;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, .6);
+}
+.account[open] { animation: dlg-in .18s ease-out; }
+.account::backdrop { background: rgba(0, 0, 0, .55); backdrop-filter: blur(2px); }
+@media (prefers-reduced-motion: reduce) { .account[open] { animation: none; } }
+
+.account form, .account .acc-step { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
+.account h2 { font-size: 18px; margin: 0 0 4px; overflow-wrap: anywhere; }
+.account input {
+  font: inherit; font-size: 16px; /* 16px để Safari iOS không tự phóng to khi gõ */
+  color: var(--fg); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 4px; padding: 10px 12px;
+}
+.account input:focus-visible { outline: none; border-color: var(--fg); }
+.account .row { display: flex; justify-content: space-between; }
+.acc-hint { margin: 0; color: var(--mute); font-size: 13px; line-height: 1.45; }
+.acc-error { margin: 10px 0 0; color: var(--accent); font-size: 13px; }
+.acc-error:empty { display: none; }
+
+/* Nút tài khoản trên header */
+.acct { font-size: 12px; padding: 4px 10px; font-family: var(--mono); color: var(--mute); }
+.acct.in { color: var(--fg); border-color: var(--fg); }
+.top-right { display: flex; align-items: center; gap: 10px; }

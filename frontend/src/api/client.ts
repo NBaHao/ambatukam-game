@@ -1,6 +1,14 @@
 // Gọi API leaderboard (backend FastAPI, cùng tên miền). Lỗi trả về dạng { error: "<code>" }.
 import { config } from "../config";
-import type { LeaderboardResponse, RankResponse, ScoreRequest, SessionRequest } from "./types";
+import type {
+  LeaderboardResponse,
+  LoginRequest,
+  MeResponse,
+  RankResponse,
+  RegisterRequest,
+  ScoreRequest,
+  SessionRequest,
+} from "./types";
 
 export class ApiError extends Error {
   readonly code: string;
@@ -38,4 +46,12 @@ export const api = {
     if (params.pid) q.set("pid", params.pid);
     return request<LeaderboardResponse>(`/api/leaderboard?${q}`, { signal });
   },
+
+  // Tài khoản: phiên đăng nhập nằm trong cookie HttpOnly `amb_sid` (Path=/api), JS không đọc được
+  me: () => request<MeResponse>("/api/me"),
+  usernameExists: (username: string) =>
+    request<{ exists: boolean }>(`/api/users/${encodeURIComponent(username)}/exists`).then((d) => d.exists),
+  register: (body: RegisterRequest) => post<MeResponse>("/api/auth/register", body),
+  login: (body: LoginRequest) => post<MeResponse>("/api/auth/login", body),
+  logout: () => post<MeResponse>("/api/auth/logout", {}),
 };

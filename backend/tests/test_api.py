@@ -41,7 +41,7 @@ def test_full_flow_submit_rename_and_board(client: TestClient, fake_clock: FakeC
     assert res.json()["name"] == "Haro"
 
     board = client.get("/api/leaderboard", params={"mode": "single", "duration": 10, "pid": PID}).json()
-    assert board["entries"] == [{"name": "Haro", "score": 39, "strokes": 39, "me": True}]
+    assert board["entries"] == [{"name": "Haro", "score": 39, "strokes": 39, "me": True, "registered": False}]
     assert board["me"]["rank"] == 1
 
 

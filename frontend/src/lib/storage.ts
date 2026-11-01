@@ -7,6 +7,7 @@ const KEY = {
   mode: "ambatukam_mode",
   name: "ambatukam_name",
   pid: "ambatukam_pid",
+  welcomed: "ambatukam_welcomed",
   best: (mode: Mode, duration: Duration) =>
     mode === "random" ? "ambatukam_best_random" : `ambatukam_best_${mode}_${duration}`,
 };
@@ -36,6 +37,13 @@ export const storage = {
   setName: (name: string) => write(KEY.name, name),
   getBest: (mode: Mode, duration: Duration) => Number(read(KEY.best(mode, duration)) || 0),
   setBest: (mode: Mode, duration: Duration, score: number) => write(KEY.best(mode, duration), String(score)),
+  /** Đã thấy hộp chọn tài khoản lần đầu chưa (chỉ tự mở một lần) */
+  getWelcomed: () => read(KEY.welcomed) === "1",
+  setWelcomed: () => write(KEY.welcomed, "1"),
+  /** Đăng nhập: dùng mã người chơi của tài khoản để điểm vào đúng tài khoản */
+  setPid: (pid: string) => write(KEY.pid, pid),
+  /** Đăng xuất: máy này thành khách mới, không đụng tới điểm của tài khoản */
+  resetPid: () => write(KEY.pid, crypto.randomUUID()),
 };
 
 // Mã người chơi ẩn danh: mỗi máy giữ một dòng điểm cao nhất trên bảng

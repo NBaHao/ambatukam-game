@@ -25,6 +25,18 @@ SUBMIT_WINDOW_SEC = 900  # hết ván quá 15 phút thì không nộp / đổi t
 NAME_MAX = 20
 TOP_N = 50
 
+# Accounts. Usernames are lowercase like TETR.IO; "guest…" is reserved for anonymous players.
+USERNAME_PATTERN = r"^[a-z0-9_-]{3,16}$"
+RESERVED_PREFIX = "guest"
+PASSWORD_MIN = 8
+PASSWORD_MAX = 128
+# PBKDF2-SHA256 iterations. Bounded by Worker CPU time (~6.6 ms per 100k measured locally):
+# 100k fits the paid plan comfortably and is borderline on the free plan's 10 ms.
+# Raising it is safe: logins re-hash passwords stored with fewer iterations.
+PW_ITERATIONS = 100_000
+SESSION_DAYS = 30
+SESSION_RENEW_DAYS = 15  # /api/me pushes the expiry forward once fewer days than this remain
+
 # Random: Lửa bắt đầu 100% (tối đa 100%), cạn (10 + 0.4·t)%/giây, mỗi nhát nạp 5%
 RND_START = 100
 RND_DRAIN = 10

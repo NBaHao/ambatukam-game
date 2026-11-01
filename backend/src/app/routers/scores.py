@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends
 
 from app import clock, rules
-from app.dependencies import HumanVerifierDep, RepositoryDep, SettingsDep, rate_limit
+from app.dependencies import HumanVerifierDep, RepositoryDep, SessionDep, SettingsDep, UsersDep, rate_limit
 from app.errors import ApiError
 from app.schemas import RankResponse, ScoreRequest
-from app.services import anticheat, tokens
+from app.services import accounts, anticheat, tokens
 
 router = APIRouter(tags=["scores"])
 
@@ -15,8 +15,13 @@ async def submit_score(
     settings: SettingsDep,
     repo: RepositoryDep,
     verify_human: HumanVerifierDep,
+    users: UsersDep,
+    login: SessionDep,
 ) -> RankResponse:
-    """Nộp điểm của một ván (hoặc nộp lại cùng ván để đổi tên). Trả về hạng hiện tại."""
+    """Nộp điểm của một ván (hoặc nộp lại cùng ván để đổi tên). Trả về hạng hiện tại.
+
+    Logged-in players always submit under their account's pid and username.
+    """
     session = tokens.verify(settings.token_secret, body.token)
     if session is None:
         raise ApiError("bad_token")
@@ -40,14 +45,16 @@ async def submit_score(
     if detail is None:
         raise ApiError("implausible")
 
+    pid, name = await accounts.score_owner(users, login, body.pid, body.name)
+
     # Kiểm tra người thật sau cùng: các bước trên rẻ hơn một lần gọi ra ngoài
     if not await verify_human(body.captcha):
         raise ApiError("captcha")
 
     rank = await repo.record_run(
         run_id=session.run_id,
-        pid=body.pid,
-        name=body.name,
+        pid=pid,
+        name=name,
         mode=session.mode,
         duration=session.duration,
         score=score,

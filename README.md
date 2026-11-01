@@ -75,6 +75,28 @@ API (`backend/src/app/routers/`, tài liệu OpenAPI ở `/api/docs`):
 | `POST /api/session` `{ mode, duration }` | Cấp token cho ván mới |
 | `POST /api/score` `{ token, captcha, pid, name, strokes, survived?, bins, fps, grip, split? }` | Nộp điểm, trả về hạng hiện tại |
 | `GET /api/leaderboard?mode=&duration=&pid=` | Top 50 và hạng của người chơi |
+| `GET /api/users/{username}/exists` | Username box: log in or "want to join?" |
+| `POST /api/auth/register` `{ username, password, email?, pid, captcha }` | Create an account, sets the session cookie |
+| `POST /api/auth/login` `{ username, password }` | Log in, sets the session cookie |
+| `POST /api/auth/logout` | Log out |
+| `GET /api/me` | The logged-in account (or `null`), renews the session |
+
+## Accounts
+
+Same model as TETR.IO, no OAuth or passkeys:
+
+- One username box. Blank means guest: play and submit scores exactly as before.
+- Unknown username: "want to join?" → stay anonymous, or register with a password (twice) and an optional email.
+- Known username: password → log in. "I forgot" only explains that email reset isn't available yet.
+- Registering moves the device's player id (and its scores) into the account. Logging in on another
+  device switches that device to the account's player id; logging out gives it a fresh guest id.
+- Logged-in scores always use the account's username. Guests can't submit under a registered username, or
+  with a player id that belongs to an account. Registered players get a ✓ on the leaderboard.
+
+Passwords: PBKDF2-SHA256 through WebCrypto, `PW_ITERATIONS` in `backend/src/app/rules.py`
+(each user row stores its own iteration count, logins re-hash with the current one, so raising it is safe).
+Sessions: random token in an HttpOnly, Secure, SameSite=Lax cookie on `/api`; D1 stores only its SHA-256.
+They last 30 days and `/api/me` renews them.
 
 ## Cách chơi
 

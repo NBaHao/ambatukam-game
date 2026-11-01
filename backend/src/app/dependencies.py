@@ -4,12 +4,13 @@ from collections.abc import Awaitable, Callable
 from functools import partial
 from typing import Annotated, Any
 
-from fastapi import Depends, Request
+from fastapi import Cookie, Depends, Request
 
+from app import clock
 from app.config import Settings
-from app.db import ScoreRepository
+from app.db import ScoreRepository, UserRepository
 from app.errors import ApiError
-from app.services import turnstile
+from app.services import accounts, passwords, turnstile
 
 HumanVerifier = Callable[[str], Awaitable[bool]]
 
@@ -27,6 +28,22 @@ def get_settings(env: Env) -> Settings:
 
 def get_repository(env: Env) -> ScoreRepository:
     return ScoreRepository(env.DB)
+
+
+def get_users(env: Env) -> UserRepository:
+    return UserRepository(env.DB)
+
+
+def get_kdf() -> passwords.Kdf:
+    return passwords.workers_pbkdf2
+
+
+async def get_session(
+    users: Annotated[UserRepository, Depends(get_users)],
+    amb_sid: Annotated[str | None, Cookie()] = None,
+) -> accounts.Session | None:
+    """The logged-in session from the `amb_sid` cookie, or None for guests."""
+    return await accounts.current_session(users, amb_sid, clock.now_ms())
 
 
 def get_human_verifier(settings: Annotated[Settings, Depends(get_settings)]) -> HumanVerifier:
@@ -48,3 +65,6 @@ def rate_limit(binding: str) -> Callable[..., Awaitable[None]]:
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 RepositoryDep = Annotated[ScoreRepository, Depends(get_repository)]
 HumanVerifierDep = Annotated[HumanVerifier, Depends(get_human_verifier)]
+UsersDep = Annotated[UserRepository, Depends(get_users)]
+KdfDep = Annotated[passwords.Kdf, Depends(get_kdf)]
+SessionDep = Annotated[accounts.Session | None, Depends(get_session)]

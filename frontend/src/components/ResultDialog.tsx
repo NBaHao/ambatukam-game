@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useAccount } from "../account/context";
 import { celebrate, stopCelebration } from "../game/audio";
 import { isTimed, type RunResult } from "../game/types";
 import { useRankPreview } from "../hooks/useRankPreview";
@@ -64,7 +65,9 @@ export function ResultDialog({ finished, open, replayProgress, onAgain, onClose,
   const inputRef = useRef<HTMLInputElement>(null);
   const againRef = useRef<HTMLButtonElement>(null);
   const captchaRef = useRef<HTMLDivElement>(null);
-  const [name, setName] = useState(storage.getName);
+  // Đã đăng nhập: luôn gửi bằng username (server cũng ép như vậy), không cho sửa tên
+  const { user } = useAccount();
+  const [name, setName] = useState(() => user?.username ?? storage.getName());
   const { state, submit, edit } = useScoreSubmission(run, finished.session, captchaRef);
   const editing = state.status === "form" || state.status === "error";
   // Ước hạng từ bảng xếp hạng ngay khi mở popup: người mới chưa có tên vẫn biết mình lọt Top 10,
@@ -180,6 +183,7 @@ export function ResultDialog({ finished, open, replayProgress, onAgain, onClose,
             id="name-input"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            readOnly={Boolean(user)}
             onFocus={() => onTypingChange(true)}
             onBlur={() => onTypingChange(false)}
             placeholder={t("namePh")}
@@ -195,7 +199,7 @@ export function ResultDialog({ finished, open, replayProgress, onAgain, onClose,
           {message(t, state, top10 && sentRank === null ? rank : null)}
         </p>
         <div className="row links">
-          {state.status === "done" && (
+          {state.status === "done" && !user && (
             <button type="button" className="link" onClick={rename}>
               {t("rename")}
             </button>
