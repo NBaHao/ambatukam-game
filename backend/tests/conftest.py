@@ -3,6 +3,7 @@ Turnstile giả. Không cần runtime Workers."""
 
 import hashlib
 import sqlite3
+from collections import Counter
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -50,12 +51,14 @@ class FakeD1:
 
 
 class FakeRateLimiter:
+    """Same contract as the Workers rate limit binding: counts per key."""
+
     def __init__(self, limit: int) -> None:
-        self.limit_n, self.hits = limit, 0
+        self.limit_n, self.hits = limit, Counter()
 
     async def limit(self, options: dict[str, str]) -> dict[str, bool]:
-        self.hits += 1
-        return {"success": self.hits <= self.limit_n}
+        self.hits[options["key"]] += 1
+        return {"success": self.hits[options["key"]] <= self.limit_n}
 
 
 class FakeClock:
@@ -73,6 +76,7 @@ def env() -> SimpleNamespace:
         SESSION_LIMIT=FakeRateLimiter(1000),
         SCORE_LIMIT=FakeRateLimiter(1000),
         AUTH_LIMIT=FakeRateLimiter(1000),
+        LOGIN_NAME_LIMIT=FakeRateLimiter(1000),
         TOKEN_SECRET="test-secret",
         TURNSTILE_SECRET="test-turnstile",
     )

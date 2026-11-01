@@ -18,6 +18,8 @@ export type SubmitState =
 function failure(err: unknown): SubmitState {
   if (err instanceof CaptchaError) return { status: "error", msg: "submitCaptcha" };
   if (err instanceof ApiError) {
+    // Inhuman rhythm (too even, too fast…): give the general reason without revealing thresholds
+    if (err.code === "implausible") return { status: "off", msg: "submitImplausible" };
     if (REJECTED_CODES.includes(err.code)) return { status: "off", msg: "submitRejected" };
     if (err.code === "expired") return { status: "off", msg: "submitExpired" };
     if (err.code === "captcha") return { status: "error", msg: "submitCaptcha" };

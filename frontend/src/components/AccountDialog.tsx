@@ -41,7 +41,8 @@ export function AccountDialog({ open, onClose }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const captchaRef = useRef<HTMLDivElement>(null);
 
-  const [step, setStep] = useState<Step>("name");
+  // Remounted on every open (key in App), so the first step comes straight from the login state
+  const [step, setStep] = useState<Step>(() => (account.user ? "me" : "name"));
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [password2, setPassword2] = useState("");
@@ -60,14 +61,16 @@ export function AccountDialog({ open, onClose }: Props) {
 
   useEffect(() => {
     const dlg = dialogRef.current!;
-    if (open && !dlg.open) {
-      go(account.user ? "me" : "name");
-      dlg.showModal();
-    } else if (!open && dlg.open) {
-      dlg.close();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy khi mở / đóng
+    if (open && !dlg.open) dlg.showModal();
+    else if (!open && dlg.open) dlg.close();
   }, [open]);
+
+  // On open and on every step change, focus the step's field (or main button).
+  // Not autoFocus: React focuses while the dialog is still closed, then showModal() moves focus to ✕.
+  useEffect(() => {
+    const dlg = dialogRef.current!;
+    if (dlg.open) dlg.querySelector<HTMLElement>("[data-autofocus]")?.focus();
+  }, [open, step]);
 
   useEffect(() => {
     const dlg = dialogRef.current!;
@@ -127,8 +130,9 @@ export function AccountDialog({ open, onClose }: Props) {
       {t("back")}
     </button>
   );
-  const pw = (value: string, set: (v: string) => void, label: string, autoComplete: string) => (
+  const pw = (value: string, set: (v: string) => void, label: string, autoComplete: string, focus = false) => (
     <input
+      data-autofocus={focus || undefined}
       type="password"
       value={value}
       onChange={(e) => set(e.target.value)}
@@ -158,7 +162,7 @@ export function AccountDialog({ open, onClose }: Props) {
             autoCapitalize="none"
             spellCheck={false}
             maxLength={16}
-            autoFocus
+            data-autofocus
           />
           <p className="acc-hint">{t("accNameHint")}</p>
           <button className="btn primary" disabled={busy}>
@@ -174,7 +178,7 @@ export function AccountDialog({ open, onClose }: Props) {
           </h2>
           {/* ô username ẩn để trình quản lý mật khẩu lưu đúng tài khoản */}
           <input type="text" value={username} autoComplete="username" readOnly hidden />
-          {pw(password, setPassword, t("accPassword"), "current-password")}
+          {pw(password, setPassword, t("accPassword"), "current-password", true)}
           <button className="btn primary" disabled={busy}>
             {t("accLogin")}
           </button>
@@ -194,7 +198,7 @@ export function AccountDialog({ open, onClose }: Props) {
             <Rich text={t("accJoin", username)} />
           </h2>
           <p className="acc-hint">{t("accJoinWhy")}</p>
-          <button type="button" className="btn primary" onClick={() => go("register")}>
+          <button type="button" className="btn primary" onClick={() => go("register")} data-autofocus>
             {t("accRegister")}
           </button>
           <button type="button" className="btn" onClick={close}>
@@ -216,6 +220,7 @@ export function AccountDialog({ open, onClose }: Props) {
             aria-label={t("accEmail")}
             autoComplete="email"
             maxLength={254}
+            data-autofocus
           />
           {pw(password, setPassword, t("accPassword"), "new-password")}
           {pw(password2, setPassword2, t("accPassword2"), "new-password")}
@@ -237,7 +242,7 @@ export function AccountDialog({ open, onClose }: Props) {
           <p className="acc-hint">
             {t("accSince", new Date(account.user.created_at).toLocaleDateString(lang))}
           </p>
-          <button type="button" className="btn" disabled={busy} onClick={() => void run(async () => {
+          <button type="button" className="btn" data-autofocus disabled={busy} onClick={() => void run(async () => {
             await account.logout();
             go("name");
           })}>

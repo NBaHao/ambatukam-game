@@ -36,6 +36,7 @@ PASSWORD_MAX = 128
 PW_ITERATIONS = 100_000
 SESSION_DAYS = 30
 SESSION_RENEW_DAYS = 15  # /api/me pushes the expiry forward once fewer days than this remain
+MAX_SESSIONS = 10  # per account; logging in on an 11th device ends the oldest session
 
 # Random: Lửa bắt đầu 100% (tối đa 100%), cạn (10 + 0.4·t)%/giây, mỗi nhát nạp 5%
 RND_START = 100

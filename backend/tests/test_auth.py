@@ -150,3 +150,45 @@ def test_password_hash_roundtrip():
         assert not await passwords.verify_password(kdf, PASSWORD + "x", stored)
 
     asyncio.run(check())
+
+
+def test_login_is_limited_per_username_across_ips(client: TestClient, env):
+    register(client)
+    env.LOGIN_NAME_LIMIT.limit_n = 3
+    for i in range(3):
+        res = client.post(
+            "/api/auth/login",
+            json={"username": "haro", "password": "wrong-password"},
+            headers={"cf-connecting-ip": f"10.0.0.{i}"},
+        )
+        assert res.status_code == 401
+    res = client.post(
+        "/api/auth/login",
+        json={"username": "HARO", "password": PASSWORD},
+        headers={"cf-connecting-ip": "10.9.9.9"},
+    )
+    assert res.status_code == 429 and res.json() == {"error": "rate_limited"}
+    # other accounts are unaffected
+    assert (
+        client.post("/api/auth/login", json={"username": "nobody", "password": PASSWORD}).status_code == 401
+    )
+
+
+def test_fullwidth_lookalike_of_username_is_taken(client: TestClient, fake_clock: FakeClock):
+    register(client)
+    client.post("/api/auth/logout")
+    res = submit(client, fake_clock, pid=OTHER_PID, name="\uff28\uff41\uff52\uff4f")  # fullwidth "HarO"
+    assert res.status_code == 409 and res.json() == {"error": "name_taken"}
+
+
+def test_login_cleans_expired_sessions_and_caps_them(client: TestClient, fake_clock: FakeClock, env):
+    register(client)
+    fake_clock.advance((rules.SESSION_DAYS + 1) * 86_400)  # the register session is now expired
+    login = {"username": "haro", "password": PASSWORD}
+    for _ in range(rules.MAX_SESSIONS + 3):
+        fake_clock.advance(1)
+        assert client.post("/api/auth/login", json=login).status_code == 200
+    rows = env.DB.conn.execute("SELECT expires_at FROM sessions").fetchall()
+    assert len(rows) == rules.MAX_SESSIONS
+    assert all(r["expires_at"] > fake_clock.ms for r in rows)
+    assert client.get("/api/me").json()["user"]["username"] == "haro"  # newest session still valid

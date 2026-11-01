@@ -54,12 +54,15 @@ def rate_limit(binding: str) -> Callable[..., Awaitable[None]]:
     """Giới hạn request theo IP bằng binding ratelimits trong wrangler.jsonc."""
 
     async def check(request: Request, env: Env) -> None:
-        ip = request.headers.get("cf-connecting-ip", "unknown")
-        outcome = await getattr(env, binding).limit({"key": ip})
-        if not outcome["success"]:
-            raise ApiError("rate_limited", 429)
+        await enforce_limit(env, binding, request.headers.get("cf-connecting-ip", "unknown"))
 
     return check
+
+
+async def enforce_limit(env: Any, binding: str, key: str) -> None:
+    outcome = await getattr(env, binding).limit({"key": key})
+    if not outcome["success"]:
+        raise ApiError("rate_limited", 429)
 
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Response
 
 from app import clock, rules
-from app.dependencies import HumanVerifierDep, KdfDep, SessionDep, UsersDep, rate_limit
+from app.dependencies import Env, HumanVerifierDep, KdfDep, SessionDep, UsersDep, enforce_limit, rate_limit
 from app.errors import ApiError
 from app.schemas import LoginRequest, MeResponse, RegisterRequest, User, Username, UsernameExistsResponse
 from app.services import accounts
@@ -50,7 +50,9 @@ async def register(
 
 
 @router.post("/auth/login", dependencies=_auth_limit)
-async def login(body: LoginRequest, response: Response, users: UsersDep, kdf: KdfDep) -> MeResponse:
+async def login(body: LoginRequest, response: Response, env: Env, users: UsersDep, kdf: KdfDep) -> MeResponse:
+    # Besides the per-IP limit: cap guesses per account, so spreading them over many IPs doesn't help
+    await enforce_limit(env, "LOGIN_NAME_LIMIT", body.username)
     user, token = await accounts.login(
         users, kdf, username=body.username, password=body.password, now_ms=clock.now_ms()
     )

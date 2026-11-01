@@ -90,13 +90,19 @@ Same model as TETR.IO, no OAuth or passkeys:
 - Known username: password → log in. "I forgot" only explains that email reset isn't available yet.
 - Registering moves the device's player id (and its scores) into the account. Logging in on another
   device switches that device to the account's player id; logging out gives it a fresh guest id.
-- Logged-in scores always use the account's username. Guests can't submit under a registered username, or
-  with a player id that belongs to an account. Registered players get a ✓ on the leaderboard.
+- Logged-in scores always use the account's username. Guests can't submit under a registered username
+  (compared after NFKC + casefold, so fullwidth look-alikes count as taken), or with a player id that
+  belongs to an account. Registered players get a ✓ on the leaderboard.
+- A blocked guest submit shows a "Log in" link in the result popup; after logging in, the same run is
+  submitted under the account.
 
 Passwords: PBKDF2-SHA256 through WebCrypto, `PW_ITERATIONS` in `backend/src/app/rules.py`
 (each user row stores its own iteration count, logins re-hash with the current one, so raising it is safe).
 Sessions: random token in an HttpOnly, Secure, SameSite=Lax cookie on `/api`; D1 stores only its SHA-256.
-They last 30 days and `/api/me` renews them.
+They last 30 days and `/api/me` renews them. Each login drops the account's expired sessions and keeps
+only the newest `MAX_SESSIONS` (10).
+Rate limits: register and login share a per-IP limit (`AUTH_LIMIT`); login also has a per-username
+limit across all IPs (`LOGIN_NAME_LIMIT`, 10 per minute) against spread-out password guessing.
 
 ## Cách chơi
 

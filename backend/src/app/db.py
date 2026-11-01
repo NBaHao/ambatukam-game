@@ -186,8 +186,22 @@ class UserRepository:
         )
         return bool(_rows(results[3])[0]["ok"])
 
-    async def create_session(self, token_hash: str, user_id: str, now: int, expires_at: int) -> None:
-        await self._db.prepare(_INSERT_SESSION).bind(token_hash, user_id, now, expires_at).all()
+    async def create_session(
+        self, token_hash: str, user_id: str, now: int, expires_at: int, *, keep: int
+    ) -> None:
+        """Open a session, drop this account's expired ones and keep only the newest `keep`."""
+        await self._db.batch(
+            [
+                self._db.prepare(_INSERT_SESSION).bind(token_hash, user_id, now, expires_at),
+                self._db.prepare("DELETE FROM sessions WHERE user_id = ?1 AND expires_at <= ?2").bind(
+                    user_id, now
+                ),
+                self._db.prepare(
+                    "DELETE FROM sessions WHERE user_id = ?1 AND token_hash NOT IN "
+                    "(SELECT token_hash FROM sessions WHERE user_id = ?1 ORDER BY created_at DESC LIMIT ?2)"
+                ).bind(user_id, keep),
+            ]
+        )
 
     async def session_user(self, token_hash: str, now: int) -> dict[str, Any] | None:
         """The account behind a session token, plus `expires_at`. None if unknown or expired."""
