@@ -1,5 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { useAccount } from "./account/context";
 import { api } from "./api/client";
+import { AccountDialog } from "./components/AccountDialog";
 import { Countdown } from "./components/Countdown";
 import { GestureBar } from "./components/GestureBar";
 import { Header } from "./components/Header";
@@ -42,6 +44,11 @@ export function App() {
   const [view, setView] = useState<"game" | "board">("game");
   const [finished, setFinished] = useState<FinishedRun | null>(null);
   const [typing, setTyping] = useState(false);
+  const account = useAccount();
+  const [accountOpen, setAccountOpen] = useState(false);
+  // Lần đầu vào game (khách): hỏi username như TETR.IO, để trống là chơi khách
+  const [welcomeDone, setWelcomeDone] = useState(false);
+  const showAccount = accountOpen || (account.welcome && !welcomeDone && !DEBUG);
   const sessionRef = useRef<Promise<string | null>>(Promise.resolve(null));
 
   useEffect(() => {
@@ -65,10 +72,10 @@ export function App() {
     });
   }, [engine]);
 
-  // Đang xem bảng xếp hạng / gõ tên thì không bắt cử chỉ xòe tay
+  // Đang xem bảng xếp hạng / gõ tên / mở hộp tài khoản thì không bắt cử chỉ xòe tay
   useEffect(() => {
-    engine.setGesturesEnabled(view === "game" && !typing);
-  }, [engine, view, typing]);
+    engine.setGesturesEnabled(view === "game" && !typing && !showAccount);
+  }, [engine, view, typing, showAccount]);
 
   useEffect(() => {
     if (!DEBUG) return;
@@ -79,6 +86,10 @@ export function App() {
     setMode(m);
     storage.setMode(m);
   };
+  const closeAccount = useCallback(() => {
+    setAccountOpen(false);
+    setWelcomeDone(true);
+  }, []);
   const goHome = useCallback(() => {
     engine.goIdle();
     setView("game");
@@ -90,7 +101,7 @@ export function App() {
 
   return (
     <>
-      <Header />
+      <Header onAccount={() => setAccountOpen(true)} />
       <main className="stage">
         <section className="cam-wrap" style={camStyle}>
           <video ref={videoRef} className="cam-video" playsInline muted />
@@ -137,6 +148,8 @@ export function App() {
           forceCelebrate={DEBUG && params.get("auto") === "top10"}
         />
       )}
+
+      <AccountDialog open={showAccount} onClose={closeAccount} />
 
       {DEBUG && (
         <Suspense>

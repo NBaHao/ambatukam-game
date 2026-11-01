@@ -63,7 +63,14 @@ export function Leaderboard({ initialMode, initialDuration, onBack }: Props) {
           entries.map((e, i) => (
             <li key={`${i}-${e.name}`} className={e.me ? "me" : undefined}>
               <span className="rk">{i + 1}</span>
-              <span className="nm">{e.name}</span>
+              <span className="nm">
+                {e.name}
+                {e.registered && (
+                  <i className="reg" title={t("boardRegistered")} aria-label={t("boardRegistered")}>
+                    ✓
+                  </i>
+                )}
+              </span>
               <span className="sc">{score(e.score)}</span>
               <span className="ct">{t("strokesN", e.strokes)}</span>
             </li>

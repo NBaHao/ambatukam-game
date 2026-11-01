@@ -21,6 +21,8 @@ function failure(err: unknown): SubmitState {
     if (REJECTED_CODES.includes(err.code)) return { status: "off", msg: "submitRejected" };
     if (err.code === "expired") return { status: "off", msg: "submitExpired" };
     if (err.code === "captcha") return { status: "error", msg: "submitCaptcha" };
+    if (err.code === "name_taken") return { status: "error", msg: "submitNameTaken" };
+    if (err.code === "login_required") return { status: "off", msg: "submitLoginRequired" };
   }
   return { status: "error", msg: "submitErr" };
 }
