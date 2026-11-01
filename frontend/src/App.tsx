@@ -46,6 +46,12 @@ export function App() {
   const [typing, setTyping] = useState(false);
   const account = useAccount();
   const [accountOpen, setAccountOpen] = useState(false);
+  // Each open mounts a fresh dialog (new key): it starts on the right step, no flash of the last one
+  const [accountKey, setAccountKey] = useState(0);
+  const openAccount = useCallback(() => {
+    setAccountKey((k) => k + 1);
+    setAccountOpen(true);
+  }, []);
   // Lần đầu vào game (khách): hỏi username như TETR.IO, để trống là chơi khách
   const [welcomeDone, setWelcomeDone] = useState(false);
   const showAccount = accountOpen || (account.welcome && !welcomeDone && !DEBUG);
@@ -101,7 +107,7 @@ export function App() {
 
   return (
     <>
-      <Header onAccount={() => setAccountOpen(true)} />
+      <Header onAccount={openAccount} />
       <main className="stage">
         <section className="cam-wrap" style={camStyle}>
           <video ref={videoRef} className="cam-video" playsInline muted />
@@ -149,7 +155,7 @@ export function App() {
         />
       )}
 
-      <AccountDialog open={showAccount} onClose={closeAccount} />
+      <AccountDialog key={accountKey} open={showAccount} onClose={closeAccount} />
 
       {DEBUG && (
         <Suspense>
