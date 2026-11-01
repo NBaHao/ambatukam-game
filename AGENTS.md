@@ -19,7 +19,7 @@ frontend/                React 19 + TypeScript + Vite
   src/components/        Component React, mỗi component một file .css riêng nếu cần
   src/hooks/             useGameEngine, useStore (đọc Store của engine), useScoreSubmission
   src/api/               Client gọi /api, kiểu dữ liệu khớp backend/src/app/schemas.py
-  src/i18n/              Chuỗi vi/en, provider, <Rich> (**đậm**)
+  src/i18n/              Chuỗi en (gốc) / vi, provider, <Rich> (**đậm**)
   src/lib/               storage (localStorage), scoring, share (ảnh kết quả), turnstile
   src/assets/audio/      Mẫu âm thanh đã cắt sẵn (giọng meme, đếm ngược, nhạc Top 10)
   src/styles/global.css  Token màu, nút, layout chung
@@ -105,7 +105,11 @@ Chrome headless không có WebGL thì MediaPipe lỗi (`activeTexture`); chạy 
 
 ## Quy ước code
 
-- Comment và chuỗi giao diện viết tiếng Việt (chuỗi người dùng thấy có cả `vi` và `en` trong `src/i18n/strings.ts`, không hardcode trong component).
+- **Ngôn ngữ: tiếng Anh là mặc định và ưu tiên, tiếng Việt là bản dịch phụ.**
+  - Giao diện: `en` là bản gốc trong `src/i18n/strings.ts` (kiểu `Strings` lấy từ `en`), viết chuỗi `en` trước rồi mới dịch `vi`. Mọi chuỗi người dùng thấy phải có đủ cả hai, không hardcode trong component.
+  - Ngôn ngữ ban đầu: lựa chọn đã lưu → trình duyệt tiếng Việt thì `vi` → còn lại `en`. Không đổi fallback sang `vi`.
+  - `index.html` (`lang`, meta description, Open Graph), tài liệu API, mã lỗi, thông báo log: tiếng Anh.
+  - Comment, tài liệu và tên mới: tiếng Anh. Comment tiếng Việt cũ không cần dịch lại hàng loạt, chỉ đổi khi sửa đoạn code đó.
 - Frontend: TypeScript strict, function component + hooks, không thêm thư viện state/UI. CSS thuần, dùng biến trong `global.css`. Lint bằng oxlint, test bằng vitest (`*.test.ts` cạnh file nguồn).
 - Engine (`src/game/`) không import React hay i18n.
 - Backend: router mỏng, logic ở `services/`, truy cập D1 chỉ qua `ScoreRepository`. Phụ thuộc (env, settings, repo, captcha, rate limit) đi qua `Depends` để test thay được. Lỗi trả về dạng `{"error": "<code>"}` qua `ApiError`. Ruff (line 110) + pytest.
