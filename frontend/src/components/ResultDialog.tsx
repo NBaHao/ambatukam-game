@@ -28,6 +28,8 @@ interface Props {
   onAgain: () => void;
   onClose: () => void;
   onOpenBoard: () => void;
+  /** Open the account dialog (when the name or device belongs to an account) */
+  onLogin: () => void;
   onTypingChange: (typing: boolean) => void;
   /** Chỉ dùng khi dev (?debug&auto=top10): xem trước hiệu ứng Top 10 dù chưa gửi điểm */
   forceCelebrate?: boolean;
@@ -55,7 +57,17 @@ function metaLine(t: Translate, run: RunResult, summary: RunSummary): string {
 }
 
 /** Popup kết quả: điểm, danh hiệu, gửi điểm lên bảng xếp hạng. Mỗi ván một instance (key = id). */
-export function ResultDialog({ finished, open, replayProgress, onAgain, onClose, onOpenBoard, onTypingChange, forceCelebrate }: Props) {
+export function ResultDialog({
+  finished,
+  open,
+  replayProgress,
+  onAgain,
+  onClose,
+  onOpenBoard,
+  onLogin,
+  onTypingChange,
+  forceCelebrate,
+}: Props) {
   const { t, strings } = useI18n();
   const { run, summary } = finished;
   const timed = isTimed(run.mode);
@@ -67,8 +79,22 @@ export function ResultDialog({ finished, open, replayProgress, onAgain, onClose,
   const captchaRef = useRef<HTMLDivElement>(null);
   // Đã đăng nhập: luôn gửi bằng username (server cũng ép như vậy), không cho sửa tên
   const { user } = useAccount();
-  const [name, setName] = useState(() => user?.username ?? storage.getName());
+  const [typedName, setName] = useState(storage.getName);
+  const name = user?.username ?? typedName;
   const { state, submit, edit } = useScoreSubmission(run, finished.session, captchaRef);
+  // Rejected because the name or player id belongs to an account: offer login right here
+  const accountBlocked =
+    (state.status === "error" || state.status === "off") &&
+    (state.msg === "submitLoginRequired" || state.msg === "submitNameTaken");
+
+  // Logged in while the popup is open: submit this run under the account (if unsent, or blocked by it)
+  const prevUserRef = useRef(user);
+  useEffect(() => {
+    const wasGuest = prevUserRef.current === null;
+    prevUserRef.current = user;
+    if (user && wasGuest && run.score > 0 && (state.status === "form" || accountBlocked)) void submit(user.username);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on login / logout
+  }, [user]);
   const editing = state.status === "form" || state.status === "error";
   // Ước hạng từ bảng xếp hạng ngay khi mở popup: người mới chưa có tên vẫn biết mình lọt Top 10,
   // người đã có tên không phải chờ Turnstile + gửi điểm (vài giây) mới thấy pháo hoa
@@ -202,6 +228,11 @@ export function ResultDialog({ finished, open, replayProgress, onAgain, onClose,
           {state.status === "done" && !user && (
             <button type="button" className="link" onClick={rename}>
               {t("rename")}
+            </button>
+          )}
+          {accountBlocked && !user && (
+            <button type="button" className="link" onClick={onLogin}>
+              {t("accLogin")}
             </button>
           )}
           <button type="button" className="link" onClick={onOpenBoard}>

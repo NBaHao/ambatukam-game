@@ -150,6 +150,7 @@ export function App() {
           onAgain={() => engine.replay()}
           onClose={goHome}
           onOpenBoard={() => setView("board")}
+          onLogin={openAccount}
           onTypingChange={setTyping}
           forceCelebrate={DEBUG && params.get("auto") === "top10"}
         />
