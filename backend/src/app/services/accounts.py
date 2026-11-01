@@ -2,6 +2,7 @@
 
 import hashlib
 import secrets
+import unicodedata
 import uuid
 from dataclasses import dataclass
 from typing import Any
@@ -28,6 +29,12 @@ def token_hash(token: str) -> str:
 
 def session_expiry(now_ms: int) -> int:
     return now_ms + rules.SESSION_DAYS * DAY_MS
+
+
+def name_key(name: str) -> str:
+    """How a typed name compares to usernames: NFKC folds look-alike forms (e.g. fullwidth
+    letters U+FF41..) into plain ASCII, casefold ignores case."""
+    return unicodedata.normalize("NFKC", name).casefold().strip()
 
 
 def public_user(user: dict[str, Any]) -> dict[str, Any]:
@@ -77,7 +84,9 @@ async def login(
         pw = await passwords.hash_password(kdf, password, rules.PW_ITERATIONS)
         await users.update_password(user["id"], pw.hash, pw.salt, pw.iterations)
     token = secrets.token_urlsafe(32)
-    await users.create_session(token_hash(token), user["id"], now_ms, session_expiry(now_ms))
+    await users.create_session(
+        token_hash(token), user["id"], now_ms, session_expiry(now_ms), keep=rules.MAX_SESSIONS
+    )
     return user, token
 
 
@@ -102,6 +111,6 @@ async def score_owner(users: UserRepository, session: Session | None, pid: str, 
         return session.user["pid"], session.user["username"]
     if await users.by_pid(pid):
         raise ApiError("login_required", 401)
-    if await users.by_username(name.lower()):
+    if await users.by_username(name_key(name)):
         raise ApiError("name_taken", 409)
     return pid, name
