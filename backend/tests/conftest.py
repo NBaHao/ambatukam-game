@@ -1,6 +1,7 @@
 """Chạy FastAPI app bằng CPython thường: D1 giả bằng sqlite3 (áp đúng migrations), rate limit giả,
 Turnstile giả. Không cần runtime Workers."""
 
+import hashlib
 import sqlite3
 from pathlib import Path
 from types import SimpleNamespace
@@ -10,7 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app import clock
-from app.dependencies import get_human_verifier
+from app.dependencies import get_human_verifier, get_kdf
 from app.main import app
 
 MIGRATIONS = Path(__file__).resolve().parents[1] / "migrations"
@@ -71,6 +72,7 @@ def env() -> SimpleNamespace:
         DB=FakeD1(),
         SESSION_LIMIT=FakeRateLimiter(1000),
         SCORE_LIMIT=FakeRateLimiter(1000),
+        AUTH_LIMIT=FakeRateLimiter(1000),
         TOKEN_SECRET="test-secret",
         TURNSTILE_SECRET="test-turnstile",
     )
@@ -92,8 +94,14 @@ def client(env: SimpleNamespace, fake_clock: FakeClock) -> TestClient:
         # Giống asgi.fetch của Workers: binding nằm ở scope["env"]
         await app({**scope, "env": env}, receive, send)
 
+    async def pbkdf2(password: bytes, salt: bytes, iterations: int) -> bytes:
+        # CPython has pbkdf2_hmac; the Worker uses WebCrypto (same algorithm, same output)
+        return hashlib.pbkdf2_hmac("sha256", password, salt, iterations)
+
     app.dependency_overrides[get_human_verifier] = lambda: verify_human
+    app.dependency_overrides[get_kdf] = lambda: pbkdf2
     try:
-        yield TestClient(with_env)
+        # https: the session cookie is Secure, so the test client only sends it back over https
+        yield TestClient(with_env, base_url="https://testserver")
     finally:
         app.dependency_overrides.clear()

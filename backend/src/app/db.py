@@ -40,9 +40,10 @@ ON CONFLICT (pid, mode, duration) DO UPDATE SET
 _RENAME = f"UPDATE scores SET name = ?5 WHERE pid = ?2 AND {_OWNS_RUN}"
 
 _TOP = """
-SELECT name, score, strokes, pid = ?3 AS me FROM scores
-WHERE mode = ?1 AND duration = ?2
-ORDER BY score DESC, updated_at ASC
+SELECT s.name, s.score, s.strokes, s.pid = ?3 AS me, u.id IS NOT NULL AS registered
+FROM scores s LEFT JOIN users u ON u.pid = s.pid
+WHERE s.mode = ?1 AND s.duration = ?2
+ORDER BY s.score DESC, s.updated_at ASC
 LIMIT ?4
 """
 
@@ -110,8 +111,108 @@ class ScoreRepository:
         top = self._db.prepare(_TOP).bind(mode, duration, pid or "", TOP_N)
         results = await self._db.batch([top, self._my_rank(mode, duration, pid)] if pid else [top])
         entries = [
-            {"name": r["name"], "score": r["score"], "strokes": r["strokes"], "me": bool(r["me"])}
+            {
+                "name": r["name"],
+                "score": r["score"],
+                "strokes": r["strokes"],
+                "me": bool(r["me"]),
+                "registered": bool(r["registered"]),
+            }
             for r in _rows(results[0])
         ]
         mine = _rows(results[1]) if pid else []
         return {"entries": entries, "me": _plain(mine[0]) if mine else None}
+
+
+_USER_COLS = "id, username, email, pw_hash, pw_salt, pw_iter, pid, created_at"
+
+# Every write of a new account is guarded by "the user row now exists": if the INSERT lost to a
+# taken username, the rest of the batch does nothing.
+_USER_ROW = "EXISTS (SELECT 1 FROM users WHERE id = ?1)"
+
+_INSERT_USER = f"""
+INSERT INTO users ({_USER_COLS})
+VALUES (?1, ?2, NULLIF(?3, ''), ?4, ?5, ?6, ?7, ?8)
+ON CONFLICT DO NOTHING
+"""
+
+_INSERT_SESSION = "INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?1, ?2, ?3, ?4)"
+
+
+_USER_KEYS = _USER_COLS.split(", ")
+
+
+class UserRepository:
+    def __init__(self, db: D1Database) -> None:
+        self._db = db
+
+    async def _user(self, query: str, *values: Any, extra: tuple[str, ...] = ()) -> dict[str, Any] | None:
+        rows = _rows(await self._db.prepare(query).bind(*values).all())
+        return {k: rows[0][k] for k in (*_USER_KEYS, *extra)} if rows else None
+
+    async def by_username(self, username: str) -> dict[str, Any] | None:
+        return await self._user(f"SELECT {_USER_COLS} FROM users WHERE username = ?1", username)
+
+    async def by_pid(self, pid: str) -> dict[str, Any] | None:
+        return await self._user(f"SELECT {_USER_COLS} FROM users WHERE pid = ?1", pid)
+
+    async def create(self, user: dict[str, Any], token_hash: str, expires_at: int) -> bool:
+        """Create the account, give its pid's scores the username and open a session, atomically.
+
+        Returns False (and writes nothing) if the username or pid is already taken.
+        """
+        uid, now = user["id"], user["created_at"]
+        results = await self._db.batch(
+            [
+                self._db.prepare(_INSERT_USER).bind(
+                    uid,
+                    user["username"],
+                    user["email"] or "",
+                    user["pw_hash"],
+                    user["pw_salt"],
+                    user["pw_iter"],
+                    user["pid"],
+                    now,
+                ),
+                self._db.prepare(f"UPDATE scores SET name = ?2 WHERE pid = ?3 AND {_USER_ROW}").bind(
+                    uid, user["username"], user["pid"]
+                ),
+                self._db.prepare(
+                    "INSERT INTO sessions (token_hash, user_id, created_at, expires_at) "
+                    f"SELECT ?2, ?1, ?3, ?4 WHERE {_USER_ROW}"
+                ).bind(uid, token_hash, now, expires_at),
+                self._db.prepare(f"SELECT {_USER_ROW} AS ok").bind(uid),
+            ]
+        )
+        return bool(_rows(results[3])[0]["ok"])
+
+    async def create_session(self, token_hash: str, user_id: str, now: int, expires_at: int) -> None:
+        await self._db.prepare(_INSERT_SESSION).bind(token_hash, user_id, now, expires_at).all()
+
+    async def session_user(self, token_hash: str, now: int) -> dict[str, Any] | None:
+        """The account behind a session token, plus `expires_at`. None if unknown or expired."""
+        cols = ", ".join(f"u.{c}" for c in _USER_KEYS)
+        return await self._user(
+            f"SELECT {cols}, s.expires_at FROM sessions s JOIN users u ON u.id = s.user_id "
+            "WHERE s.token_hash = ?1 AND s.expires_at > ?2",
+            token_hash,
+            now,
+            extra=("expires_at",),
+        )
+
+    async def extend_session(self, token_hash: str, expires_at: int) -> None:
+        await (
+            self._db.prepare("UPDATE sessions SET expires_at = ?2 WHERE token_hash = ?1")
+            .bind(token_hash, expires_at)
+            .all()
+        )
+
+    async def delete_session(self, token_hash: str) -> None:
+        await self._db.prepare("DELETE FROM sessions WHERE token_hash = ?1").bind(token_hash).all()
+
+    async def update_password(self, user_id: str, pw_hash: str, pw_salt: str, pw_iter: int) -> None:
+        await (
+            self._db.prepare("UPDATE users SET pw_hash = ?2, pw_salt = ?3, pw_iter = ?4 WHERE id = ?1")
+            .bind(user_id, pw_hash, pw_salt, pw_iter)
+            .all()
+        )

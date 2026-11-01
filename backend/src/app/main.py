@@ -5,6 +5,12 @@
                            survived?, bins, fps, grip, split? }  → { name, score, strokes, rank, total }
   GET  /api/leaderboard  ?mode=&duration=&pid=                  → { entries, me }
 
+  GET  /api/users/{username}/exists                             → { exists }
+  POST /api/auth/register { username, password, email?, pid, captcha } → { user }  (sets amb_sid cookie)
+  POST /api/auth/login    { username, password }                → { user }  (sets amb_sid cookie)
+  POST /api/auth/logout                                         → { user: null }
+  GET  /api/me                                                  → { user | null }
+
 Tài liệu OpenAPI: /api/docs. Game và API cùng tên miền nên không cần CORS
 (chạy local thì Vite proxy /api sang Worker).
 """
