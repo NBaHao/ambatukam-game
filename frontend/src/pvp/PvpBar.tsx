@@ -5,7 +5,7 @@ import { useI18n, type Translate } from "../i18n/context";
 import { Rich } from "../i18n/Rich";
 import type { TextKey } from "../i18n/strings";
 import { RoomInvites } from "../friends/RoomInvites";
-import { roomPath } from "../lib/route";
+import { inviteUrl } from "../lib/route";
 import { modeName } from "../lib/share";
 import type { RoomView } from "./RoomClient";
 import type { PvpSession } from "./PvpSession";
@@ -29,9 +29,9 @@ function opponentLine(t: Translate, view: RoomView): string {
 }
 
 function InviteLink({ code }: { code: string }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [copied, setCopied] = useState(false);
-  const url = new URL(roomPath(code), location.origin).toString();
+  const url = inviteUrl(code, lang);
   const copy = () => {
     void navigator.clipboard?.writeText(url).then(() => {
       setCopied(true);

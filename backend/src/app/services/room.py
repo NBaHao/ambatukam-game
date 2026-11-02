@@ -92,6 +92,14 @@ class RoomLogic:
             "last": s["last"],
         }
 
+    def preview(self) -> dict[str, Any] | None:
+        """What an invite link's preview may show: the host's name and the room settings, nothing private."""
+        if self.state is None:
+            return None
+        s = self._s
+        host = s["players"][0]["name"] if s["players"] else None
+        return {"host": host, "mode": s["mode"], "duration": s["duration"]}
+
     def _states(self) -> list[Out]:
         return [Out(p["pid"], self.snapshot(p["pid"])) for p in self._s["players"] if p["connected"]]
 

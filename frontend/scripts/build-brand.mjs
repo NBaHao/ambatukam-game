@@ -1,6 +1,7 @@
 // Xuất favicon, icon cài app và ảnh preview chia sẻ link từ hai file nguồn SVG:
 //   public/favicon.svg → public/favicon.ico, public/apple-touch-icon.png, public/icons/icon-*.png
 //   brand/og.svg       → public/og.png
+//   brand/og-invite.svg → public/og-invite.png (preview of PvP invite links)
 // Chạy: npm run brand (sau khi sửa SVG), rồi commit các file được tạo ra.
 import sharp from "sharp";
 import pngToIco from "png-to-ico";
@@ -10,6 +11,7 @@ const root = new URL("../", import.meta.url);
 const path = (p) => new URL(p, root);
 const icon = await readFile(path("public/favicon.svg"));
 const og = await readFile(path("brand/og.svg"));
+const ogInvite = await readFile(path("brand/og-invite.svg"));
 
 // density cao để SVG được vẽ nét ở cỡ lớn rồi mới thu nhỏ
 const png = (svg, size, opts = {}) => {
@@ -32,6 +34,7 @@ const out = {
   "public/icons/icon-512.png": await png(icon, 512),
   "public/icons/icon-maskable-512.png": await png(maskable, 512),
   "public/og.png": await sharp(og, { density: 144 }).resize(1200, 630).png({ compressionLevel: 9 }).toBuffer(),
+  "public/og-invite.png": await sharp(ogInvite, { density: 144 }).resize(1200, 630).png({ compressionLevel: 9 }).toBuffer(),
 };
 for (const [file, buf] of Object.entries(out)) {
   await writeFile(path(file), buf);

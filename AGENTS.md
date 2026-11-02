@@ -27,15 +27,16 @@ frontend/                React 19 + TypeScript + Vite
   src/assets/audio/      Mẫu âm thanh đã cắt sẵn (giọng meme, đếm ngược, nhạc Top 10)
   src/styles/global.css  Token màu, nút, layout chung
   public/                favicon, icon, og.png, site.webmanifest (copy nguyên vào dist)
-  brand/, scripts/       Nguồn og.svg, dựng icon (`npm run brand`), cắt âm thanh (`npm run sound`, `npm run sound:countdown`)
+  brand/, scripts/       Nguồn og.svg, og-invite.svg, dựng icon (`npm run brand`), cắt âm thanh (`npm run sound`, `npm run sound:countdown`)
 backend/                 FastAPI trên Cloudflare Python Workers (quản lý bằng uv + pywrangler)
-  src/entry.py           WorkerEntrypoint → ASGI; /api/rooms/{code}/ws → PvpRoom, /api/lobby/ws → Lobby
+  src/entry.py           WorkerEntrypoint → ASGI; /api/rooms/{code}/ws → PvpRoom, /api/lobby/ws → Lobby;
+                         /c/{code} → index.html with the invite's link preview (services/invite_preview.py)
   src/pvp_room.py        PvpRoom (Durable Object): WebSockets + room state, rules in services/room.py
   src/lobby_room.py      Lobby (Durable Object, one instance): presence, PvP invites, matchmaking; rules in services/lobby.py
   src/app/main.py        create_app(): router, error handler, /api/docs
   src/app/routers/       sessions, scores, leaderboard, auth, rooms, profiles, friends, lobby
   src/app/services/      tokens (HMAC), anticheat, turnstile, names, accounts, passwords (PBKDF2), tickets, room, rtc, resets, mailer,
-                         profiles, friends, lobby
+                         profiles, friends, lobby, invite_preview
   src/app/db.py          ScoreRepository, UserRepository trên D1
   src/app/rules.py       Hằng số luật chơi / chống gian lận
   migrations/            D1 migrations (đánh số 000N_*.sql)
@@ -111,6 +112,9 @@ Chrome headless không có WebGL thì MediaPipe lỗi (`activeTexture`); chạy 
   (state, progress, result, media, signal, pong, error; close codes 4000/4001). Room code format: `ROOM_CODE_*` in `rules.py`
   ↔ the `/c/` pattern in `frontend/src/lib/route.ts`. `PVP_START_DELAY_MS` must stay longer than the client
   countdown (`COUNTDOWN_LEAD_MS` in `GameEngine.ts`).
+- Invite link previews: the `<title>`, description, canonical and `og:*` tags in `frontend/index.html` ↔ what
+  `services/invite_preview.py` rewrites for `/c/<code>` (`tests/test_invite_preview.py` reads index.html);
+  `?lang=vi` from `inviteUrl` in `lib/route.ts` picks the Vietnamese preview.
 - Lobby socket messages: `frontend/src/friends/protocol.ts` ↔ `backend/src/app/services/lobby.py` / `src/lobby_room.py`
   (the `{"t":"hb"}` keep-alive is answered by the runtime: change both ends together).
 - Durable Objects `PvpRoom`, `Lobby`: renaming or removing the class needs a new entry in `migrations` of `wrangler.jsonc`

@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <!-- Link preview for PvP invites (/c/<code>). The Worker swaps the title / description per room
+       (backend/src/app/services/invite_preview.py), so the picture stays free of words that need translating.
+       Run `npm run brand` after editing to export public/og-invite.png -->
+  <style>
+    .sans { font-family: "SF Pro Display", "Helvetica Neue", Arial, sans-serif; }
+    .mono { font-family: "SF Mono", Menlo, monospace; }
+  </style>
+  <defs>
+    <!-- The rod with its valid zone and hand landmark dots, as in og.svg -->
+    <g id="rod">
+      <rect x="-62" y="-170" width="124" height="340" rx="62" fill="none" stroke="#8b8b8b" stroke-width="2.5" stroke-dasharray="7 9"/>
+      <rect x="-15" y="-150" width="30" height="300" rx="15" fill="#d9d9d9"/>
+      <rect x="-15" y="-3" width="30" height="6" fill="#0b0b0b"/>
+      <g fill="#f2f2f2">
+        <circle cx="-40" cy="-28" r="4.5"/><circle cx="-31" cy="-30" r="4.5"/>
+        <circle cx="-42" cy="-6" r="4.5"/><circle cx="-33" cy="-8" r="4.5"/>
+        <circle cx="-43" cy="16" r="4.5"/><circle cx="-34" cy="14" r="4.5"/>
+        <circle cx="-41" cy="38" r="4.5"/><circle cx="-32" cy="36" r="4.5"/>
+        <circle cx="40" cy="-14" r="4.5"/><circle cx="2" cy="2" r="4.5"/>
+      </g>
+    </g>
+  </defs>
+  <rect width="1200" height="630" fill="#0b0b0b"/>
+
+  <!-- Logo as in the header, site on the right -->
+  <rect x="80" y="70" width="18" height="18" fill="#ff3b3b"/>
+  <text x="116" y="88" class="sans" font-size="24" font-weight="800" letter-spacing="3" fill="#f2f2f2">AMBATUKAM</text>
+  <text x="1120" y="88" class="mono" font-size="22" fill="#8b8b8b" text-anchor="end">ambatukam.bahao.site</text>
+
+  <text x="76" y="196" class="sans" font-size="84" font-weight="800" letter-spacing="-1" fill="#f2f2f2">PvP · 1v1</text>
+
+  <!-- Two cameras face off -->
+  <rect x="80" y="240" width="440" height="330" rx="10" fill="#000" stroke="#2a2a2a" stroke-width="2"/>
+  <rect x="680" y="240" width="440" height="330" rx="10" fill="#000" stroke="#ff3b3b" stroke-width="2"/>
+  <use href="#rod" transform="translate(330 400) rotate(18) scale(.82)"/>
+  <use href="#rod" transform="translate(930 400) rotate(-18) scale(.82)"/>
+  <text x="104" y="548" class="mono" font-size="84" font-weight="700" fill="#f2f2f2">42</text>
+  <text x="704" y="548" class="mono" font-size="84" font-weight="700" fill="#ff3b3b">38</text>
+
+  <circle cx="600" cy="405" r="54" fill="#ff3b3b"/>
+  <text x="600" y="421" class="sans" font-size="44" font-weight="800" fill="#fff" text-anchor="middle">VS</text>
+</svg>
