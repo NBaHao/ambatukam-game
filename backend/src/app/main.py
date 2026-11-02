@@ -10,6 +10,7 @@
   POST /api/auth/login    { username, password }                → { user }  (sets amb_sid cookie)
   POST /api/auth/logout                                         → { user: null }
   GET  /api/me                                                  → { user | null }
+  GET  /api/users/{username}   → { username, joined_at, records, pvp, matches }  (public profile)
 
   POST /api/rooms              { mode, duration, pid, name }    → { code, ticket }
   POST /api/rooms/{code}/join  { pid, name }                    → { code, ticket }

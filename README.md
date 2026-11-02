@@ -81,6 +81,7 @@ API (`backend/src/app/routers/`, tài liệu OpenAPI ở `/api/docs`):
 | `POST /api/auth/login` `{ username, password }` | Log in, sets the session cookie |
 | `POST /api/auth/logout` | Log out |
 | `GET /api/me` | The logged-in account (or `null`), renews the session |
+| `GET /api/users/{username}` | Public profile: best score per board with rank, PvP totals, latest 20 matches |
 | `POST /api/rooms` `{ mode, duration, pid, name }` | Create a PvP room: `{ code, ticket }` |
 | `POST /api/rooms/{code}/join` `{ pid, name }` | Ticket to join a room |
 | `GET /api/rooms/{code}/ws?ticket=` | WebSocket to the room (Durable Object) |
@@ -107,6 +108,13 @@ They last 30 days and `/api/me` renews them. Each login drops the account's expi
 only the newest `MAX_SESSIONS` (10).
 Rate limits: register and login share a per-IP limit (`AUTH_LIMIT`); login also has a per-username
 limit across all IPs (`LOGIN_NAME_LIMIT`, 10 per minute) against spread-out password guessing.
+
+## Profiles
+
+Every account has a public page at `/u/<username>`: best score on each board with its current rank, PvP
+wins / losses / draws and the latest 20 matches (opponents who played logged in link to their own page).
+Open it from the account menu (**My profile**), a ✓ name on the leaderboard, or the opponent's name in a
+PvP result. Guests have no profile. The API returns no player ids, email or sign-in data.
 
 ## PvP
 

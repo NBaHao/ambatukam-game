@@ -11,6 +11,7 @@
 .board .rk { font-family: var(--mono); color: var(--mute); text-align: right; }
 .board li:nth-child(-n+3) .rk { color: var(--accent); font-weight: 700; }
 .board .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.board .nm a { color: inherit; text-underline-offset: 3px; }
 /* Dấu ✓ cạnh tên người chơi có tài khoản */
 .board .reg { font-style: normal; font-size: 11px; color: var(--accent); margin-left: 6px; }
 .board .sc { font-family: var(--mono); font-weight: 700; font-variant-numeric: tabular-nums; }

@@ -71,6 +71,35 @@ export interface RoomTicket {
   ticket: string;
 }
 
+/** GET /api/users/{username} (ProfileResponse in schemas.py) */
+export interface ProfileRecord {
+  mode: "single" | "double" | "random";
+  duration: number;
+  score: number;
+  strokes: number;
+  rank: number;
+  total: number;
+}
+
+export interface ProfileMatch {
+  id: string;
+  mode: "single" | "double";
+  duration: number;
+  ended_at: number;
+  result: "win" | "loss" | "draw";
+  status: "ok" | "rejected" | "forfeit";
+  strokes: number;
+  opponent: { name: string; username: string | null; strokes: number; status: string } | null;
+}
+
+export interface Profile {
+  username: string;
+  joined_at: number;
+  records: ProfileRecord[];
+  pvp: { played: number; wins: number; losses: number; draws: number };
+  matches: ProfileMatch[];
+}
+
 /** Luật tên / mật khẩu, khớp backend/src/app/rules.py */
 export const USERNAME_RE = /^[a-z0-9_-]{3,16}$/;
 export const RESERVED_PREFIX = "guest";

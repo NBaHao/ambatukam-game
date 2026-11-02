@@ -4,6 +4,7 @@ import type {
   LeaderboardResponse,
   LoginRequest,
   MeResponse,
+  Profile,
   RankResponse,
   RegisterRequest,
   RoomTicket,
@@ -55,6 +56,8 @@ export const api = {
   register: (body: RegisterRequest) => post<MeResponse>("/api/auth/register", body),
   login: (body: LoginRequest) => post<MeResponse>("/api/auth/login", body),
   logout: () => post<MeResponse>("/api/auth/logout", {}),
+  profile: (username: string, signal?: AbortSignal) =>
+    request<Profile>(`/api/users/${encodeURIComponent(username)}`, { signal }),
 
   // PvP: a signed ticket for the room socket (roomSocketUrl in src/pvp/RoomClient.ts)
   createRoom: (body: { mode: string; duration: number; pid: string; name: string }) =>
