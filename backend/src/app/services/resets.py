@@ -41,10 +41,17 @@ _TEXT = {
     },
 }
 
-# Same colors as the game (frontend/src/styles/global.css). Email clients need tables and inline styles.
-_BG, _PANEL, _LINE, _FG, _MUTE, _ACCENT = "#0b0b0b", "#121212", "#2a2a2a", "#f2f2f2", "#8b8b8b", "#ff3b3b"
+# Light by default; a dark palette for clients that support prefers-color-scheme (Apple Mail, iOS Mail…).
+# The page itself has no background, so the email sits on the client's own light or dark background.
+# Email clients need tables and inline styles: the <style> block only overrides colors.
+_CARD, _LINE, _FG, _MUTE, _ACCENT = "#ffffff", "#e4e4e7", "#18181b", "#71717a", "#e5322d"
 _SANS = "-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
 _MONO = "ui-monospace,'SF Mono',Menlo,Consolas,monospace"
+_DARK = """@media (prefers-color-scheme: dark) {
+  .card { background:#1c1c1f !important; border-color:#2e2e33 !important; }
+  .fg { color:#f4f4f5 !important; } .mute, .mute a { color:#a1a1aa !important; }
+  .line { background:#2e2e33 !important; }
+}"""
 
 
 def reset_email(to: str, name: str, link: str, lang: str) -> Email:
@@ -59,40 +66,40 @@ def reset_email(to: str, name: str, link: str, lang: str) -> Email:
 def _html(s: dict[str, str], name: str, link: str, site: str, lang: str) -> str:
     e = html.escape
     href = e(link, quote=True)
-    intro = e(s["intro"]).replace(e(name), f'<b style="color:{_FG}">{e(name)}</b>', 1)
-    p = f"margin:0 0 16px;font:16px/1.5 {_SANS};color:{_FG}"
-    small = f"margin:0;font:13px/1.5 {_SANS};color:{_MUTE}"
+    intro = e(s["intro"]).replace(e(name), f'<b class="fg" style="color:{_FG}">{e(name)}</b>', 1)
+    p = f'class="fg" style="margin:0 0 16px;font:16px/1.5 {_SANS};color:{_FG}'
+    small = f'class="mute" style="margin:0;font:13px/1.5 {_SANS};color:{_MUTE}'
     return f"""<!doctype html>
 <html lang="{lang}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="color-scheme" content="dark"><meta name="supported-color-schemes" content="dark">
-<title>{e(s["subject"])}</title></head>
-<body style="margin:0;padding:0;background:{_BG}">
+<meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark">
+<title>{e(s["subject"])}</title>
+<style>{_DARK}</style></head>
+<body style="margin:0;padding:0">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0">{e(s["preview"])}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="{_BG}"\
- style="background:{_BG}">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
 <tr><td align="center" style="padding:32px 16px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px">
-<tr><td style="padding:0 4px 20px;font:800 18px/1 {_MONO};letter-spacing:.12em;color:{_FG}">\
+<tr><td class="fg" style="padding:0 4px 20px;font:800 18px/1 {_MONO};letter-spacing:.12em;color:{_FG}">\
 AMBATUKAM</td></tr>
-<tr><td bgcolor="{_PANEL}" style="background:{_PANEL};border:1px solid {_LINE};\
+<tr><td class="card" bgcolor="{_CARD}" style="background:{_CARD};border:1px solid {_LINE};\
 border-radius:14px;padding:32px 28px">
-<h1 style="margin:0 0 20px;font:800 24px/1.25 {_SANS};color:{_FG}">{e(s["title"])}</h1>
-<p style="{p}">{e(s["hi"])}</p>
-<p style="{p};margin-bottom:28px">{intro}</p>
+<h1 class="fg" style="margin:0 0 20px;font:800 24px/1.25 {_SANS};color:{_FG}">{e(s["title"])}</h1>
+<p {p}">{e(s["hi"])}</p>
+<p {p};margin-bottom:28px">{intro}</p>
 <table role="presentation" cellpadding="0" cellspacing="0"><tr>
 <td bgcolor="{_ACCENT}" style="background:{_ACCENT};border-radius:10px">
 <a href="{href}" style="display:inline-block;padding:14px 26px;font:700 16px/1 {_SANS};color:#ffffff;\
 text-decoration:none;border-radius:10px">{e(s["button"])}</a></td></tr></table>
-<p style="{small};margin-top:20px">{e(s["ttl"])}</p>
-<div style="height:1px;background:{_LINE};margin:24px 0"></div>
-<p style="{small};margin-bottom:8px">{e(s["fallback"])}</p>
-<p style="margin:0;font:12px/1.5 {_MONO};word-break:break-all">\
+<p {small};margin-top:20px">{e(s["ttl"])}</p>
+<div class="line" style="height:1px;background:{_LINE};margin:24px 0"></div>
+<p {small};margin-bottom:8px">{e(s["fallback"])}</p>
+<p class="mute" style="margin:0;font:12px/1.5 {_MONO};word-break:break-all">\
 <a href="{href}" style="color:{_MUTE};text-decoration:underline">{e(link)}</a></p>
 </td></tr>
 <tr><td style="padding:20px 4px 0">
-<p style="{small}">{e(s["ignore"])}</p>
-<p style="{small};margin-top:8px"><a href="{e(site, quote=True)}" style="color:{_MUTE}">{e(site.split("://")[-1])}</a></p>
+<p {small}">{e(s["ignore"])}</p>
+<p {small};margin-top:8px"><a href="{e(site, quote=True)}" style="color:{_MUTE}">{e(site.split("://")[-1])}</a></p>
 </td></tr>
 </table></td></tr></table></body></html>"""
 
