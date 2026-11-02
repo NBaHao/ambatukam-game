@@ -10,6 +10,10 @@
   POST /api/auth/login    { username, password }                → { user }  (sets amb_sid cookie)
   POST /api/auth/logout                                         → { user: null }
   GET  /api/me                                                  → { user | null }
+  PUT  /api/me/email      { email | null, password }            → { user }
+  GET  /api/auth/reset                                          → { available }  (false: no email service)
+  POST /api/auth/reset/request { username, captcha, lang }      → { available }  (emails a link, if any)
+  POST /api/auth/reset    { token, password }                   → { user }  (sets amb_sid, other sessions end)
   GET  /api/users/{username}   → { username, joined_at, records, pvp, matches, relation }  (public profile)
 
   POST /api/rooms              { mode, duration, pid, name }    → { code, ticket }

@@ -47,6 +47,8 @@ export interface User {
   /** Mã người chơi của tài khoản: client lưu lại làm playerId() */
   pid: string;
   created_at: number;
+  /** Only the account itself sees it: where password reset links go (null: none set) */
+  email?: string | null;
 }
 
 export interface MeResponse {

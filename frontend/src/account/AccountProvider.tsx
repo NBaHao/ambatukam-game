@@ -58,9 +58,35 @@ export function AccountProvider({ children }: { children: ReactNode }) {
     setUserState(null);
   }, []);
 
+  const requestReset = useCallback<Account["requestReset"]>(async (username, lang, captchaEl) => {
+    const captcha = await getCaptchaToken(captchaEl);
+    await api.resetRequest({ username, captcha, lang });
+  }, []);
+
+  const completeReset = useCallback<Account["completeReset"]>(
+    async (token, password) => setUser((await api.resetComplete({ token, password })).user),
+    [setUser],
+  );
+
+  const changeEmail = useCallback<Account["changeEmail"]>(
+    async (email, password) => setUser((await api.changeEmail({ email, password })).user),
+    [setUser],
+  );
+
   const value = useMemo<Account>(
-    () => ({ user, ready, welcome, usernameExists: api.usernameExists, login, register, logout }),
-    [user, ready, welcome, login, register, logout],
+    () => ({
+      user,
+      ready,
+      welcome,
+      usernameExists: api.usernameExists,
+      login,
+      register,
+      logout,
+      requestReset,
+      completeReset,
+      changeEmail,
+    }),
+    [user, ready, welcome, login, register, logout, requestReset, completeReset, changeEmail],
   );
   return <AccountContext value={value}>{children}</AccountContext>;
 }

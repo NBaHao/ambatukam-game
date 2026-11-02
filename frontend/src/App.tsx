@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState, type CSSPrope
 import { useAccount } from "./account/context";
 import { api } from "./api/client";
 import { AccountDialog } from "./components/AccountDialog";
+import { ResetDialog } from "./components/ResetDialog";
 import { Countdown } from "./components/Countdown";
 import { GestureBar } from "./components/GestureBar";
 import { Header } from "./components/Header";
@@ -141,7 +142,7 @@ export function App() {
   // Đang xem bảng xếp hạng / gõ tên / mở hộp tài khoản thì không bắt cử chỉ xòe tay
   useEffect(() => {
     engine.setGesturesEnabled(
-      view === "game" && route.name !== "profile" && !typing && !showAccount && !friendsOpen && !lobby,
+      view === "game" && route.name !== "profile" && route.name !== "reset" && !typing && !showAccount && !friendsOpen && !lobby,
     );
   }, [engine, view, route.name, typing, showAccount, friendsOpen, lobby]);
 
@@ -261,6 +262,7 @@ export function App() {
       )}
 
       <AccountDialog key={accountKey} open={showAccount} onClose={closeAccount} />
+      {route.name === "reset" && <ResetDialog key={route.token} token={route.token} />}
       <FriendsDialog open={friendsOpen} onClose={closeFriends} onLogin={openAccount} onChallenge={challenge} />
       {phase !== "countdown" && phase !== "playing" && <InviteToasts onJoin={joinInvite} />}
 

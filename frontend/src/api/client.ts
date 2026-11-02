@@ -58,6 +58,17 @@ export const api = {
   register: (body: RegisterRequest) => post<MeResponse>("/api/auth/register", body),
   login: (body: LoginRequest) => post<MeResponse>("/api/auth/login", body),
   logout: () => post<MeResponse>("/api/auth/logout", {}),
+  // Password reset by email (off when the server has no email service)
+  resetAvailable: () => request<{ available: boolean }>("/api/auth/reset").then((d) => d.available),
+  resetRequest: (body: { username: string; captcha: string; lang: string }) =>
+    post<{ available: boolean }>("/api/auth/reset/request", body),
+  resetComplete: (body: { token: string; password: string }) => post<MeResponse>("/api/auth/reset", body),
+  changeEmail: (body: { email: string | null; password: string }) =>
+    request<MeResponse>("/api/me/email", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    }),
   profile: (username: string, signal?: AbortSignal) =>
     request<Profile>(`/api/users/${encodeURIComponent(username)}`, { signal }),
 

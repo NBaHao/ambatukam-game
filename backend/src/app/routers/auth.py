@@ -1,10 +1,31 @@
 from fastapi import APIRouter, Depends, Response
 
 from app import clock, rules
-from app.dependencies import Env, HumanVerifierDep, KdfDep, SessionDep, UsersDep, enforce_limit, rate_limit
+from app.dependencies import (
+    Env,
+    HumanVerifierDep,
+    KdfDep,
+    MailerDep,
+    SessionDep,
+    SettingsDep,
+    UsersDep,
+    enforce_limit,
+    rate_limit,
+)
 from app.errors import ApiError
-from app.schemas import LoginRequest, MeResponse, RegisterRequest, User, Username, UsernameExistsResponse
-from app.services import accounts
+from app.schemas import (
+    EmailChange,
+    LoginRequest,
+    MeResponse,
+    RegisterRequest,
+    ResetAvailableResponse,
+    ResetComplete,
+    ResetRequest,
+    User,
+    Username,
+    UsernameExistsResponse,
+)
+from app.services import accounts, resets
 
 router = APIRouter(tags=["accounts"])
 
@@ -77,3 +98,53 @@ async def me(response: Response, users: UsersDep, session: SessionDep) -> MeResp
     if session.expires_at - now < rules.SESSION_RENEW_DAYS * accounts.DAY_MS:
         await users.extend_session(session.token_hash, accounts.session_expiry(now))
     return MeResponse(user=User(**accounts.public_user(session.user)))
+
+
+@router.get("/auth/reset")
+async def reset_available(send: MailerDep) -> ResetAvailableResponse:
+    """Whether "forgot password" can email a link (the server has an email service)."""
+    return ResetAvailableResponse(available=send is not None)
+
+
+@router.post("/auth/reset/request", dependencies=_auth_limit)
+async def reset_request(
+    body: ResetRequest,
+    env: Env,
+    settings: SettingsDep,
+    users: UsersDep,
+    send: MailerDep,
+    verify_human: HumanVerifierDep,
+) -> ResetAvailableResponse:
+    """Email a reset link to the account's address, if it has one. The answer is the same either way."""
+    if send is None:
+        raise ApiError("reset_unavailable", 503)
+    if not await verify_human(body.captcha):
+        raise ApiError("captcha")
+    await enforce_limit(env, "LOGIN_NAME_LIMIT", body.username)
+    await resets.request(
+        users, send, username=body.username, origin=settings.app_origin, lang=body.lang, now=clock.now_ms()
+    )
+    return ResetAvailableResponse(available=True)
+
+
+@router.post("/auth/reset", dependencies=_auth_limit)
+async def reset_complete(body: ResetComplete, response: Response, users: UsersDep, kdf: KdfDep) -> MeResponse:
+    """Set a new password from an email link: logs out every device, then logs this one in."""
+    user, token = await resets.complete(
+        users, kdf, token=body.token, password=body.password, now=clock.now_ms()
+    )
+    _set_cookie(response, token)
+    return MeResponse(user=User(**accounts.public_user(user)))
+
+
+@router.put("/me/email", dependencies=_auth_limit)
+async def change_email(
+    body: EmailChange, env: Env, users: UsersDep, kdf: KdfDep, session: SessionDep
+) -> MeResponse:
+    """Add, change or remove the email used for password resets (needs the current password)."""
+    if session is None:
+        raise ApiError("login_required", 401)
+    await enforce_limit(env, "LOGIN_NAME_LIMIT", session.user["username"])
+    await resets.change_email(users, kdf, session.user, email=body.email, password=body.password)
+    user = {**session.user, "email": body.email}
+    return MeResponse(user=User(**accounts.public_user(user)))
