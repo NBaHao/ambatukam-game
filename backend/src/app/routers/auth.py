@@ -21,6 +21,7 @@ from app.schemas import (
     ResetAvailableResponse,
     ResetComplete,
     ResetRequest,
+    ResetSentResponse,
     User,
     Username,
     UsernameExistsResponse,
@@ -114,7 +115,7 @@ async def reset_request(
     users: UsersDep,
     send: MailerDep,
     verify_human: HumanVerifierDep,
-) -> ResetAvailableResponse:
+) -> ResetSentResponse:
     """Email a reset link to the account's address, if it has one. The answer is the same either way."""
     if send is None:
         raise ApiError("reset_unavailable", 503)
@@ -124,7 +125,7 @@ async def reset_request(
     await resets.request(
         users, send, username=body.username, origin=settings.app_origin, lang=body.lang, now=clock.now_ms()
     )
-    return ResetAvailableResponse(available=True)
+    return ResetSentResponse(retry_in=rules.RESET_GAP_SEC)
 
 
 @router.post("/auth/reset", dependencies=_auth_limit)

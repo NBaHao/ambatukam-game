@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useAccount } from "../account/context";
-import { ApiError, api } from "../api/client";
+import { ApiError } from "../api/client";
 import { PASSWORD_MAX, PASSWORD_MIN, RESERVED_PREFIX, USERNAME_RE } from "../api/types";
 import { useI18n, type Translate } from "../i18n/context";
 import { Rich } from "../i18n/Rich";
@@ -13,8 +13,8 @@ import "./AccountDialog.css";
  * Trống → khách. Tên đã có → nhập mật khẩu. Tên chưa có → "tạo tài khoản?" → email (tuỳ chọn) + mật khẩu ×2.
  */
 type Step = "name" | "login" | "join" | "register" | "me";
-/** "I forgot": checking whether the server can email, then asking / sent, or "none" (old help text) */
-type Forgot = "off" | "loading" | "ask" | "sent" | "none";
+/** "I forgot" sends at once: sending → sent (resend after a countdown) / failed (retry), or "none" (no email service) */
+type Forgot = "off" | "sending" | "sent" | "failed" | "none";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -27,6 +27,11 @@ function usernameError(name: string) {
   if (!USERNAME_RE.test(name)) return "accErrName" as const;
   if (name.startsWith(RESERVED_PREFIX)) return "accErrReserved" as const;
   return null;
+}
+
+/** 95 → "1:35" */
+function clockText(sec: number): string {
+  return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
 }
 
 function errorText(t: Translate, err: unknown): string {
@@ -58,6 +63,8 @@ export function AccountDialog({ open, onClose }: Props) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [forgot, setForgot] = useState<Forgot>("off");
+  const [resendAt, setResendAt] = useState(0); // ms timestamp when "resend" unlocks
+  const [resendLeft, setResendLeft] = useState(0); // whole seconds still to wait
   const [emailEdit, setEmailEdit] = useState(false);
   const [notice, setNotice] = useState("");
 
@@ -137,20 +144,48 @@ export function AccountDialog({ open, onClose }: Props) {
     });
   };
 
-  const onForgot = () => {
-    if (forgot !== "off") return;
-    setForgot("loading");
-    api
-      .resetAvailable()
-      .then((ok) => setForgot(ok ? "ask" : "none"))
-      .catch(() => setForgot("none"));
+  // "I forgot" and "resend" both just switch to "sending": the effect below sends once the captcha box
+  // is on screen (Turnstile needs it, in case it asks for a click).
+  const sendReset = () => {
+    if (busy || forgot === "sending" || forgot === "none") return;
+    setForgot("sending");
   };
 
-  const sendReset = () =>
-    void run(async () => {
-      await account.requestReset(username, lang, captchaRef.current!);
+  const requestReset = account.requestReset;
+  const sendingRef = useRef(false); // one request per "sending", even if the effect runs twice
+  const doSend = useCallback(async () => {
+    if (sendingRef.current) return;
+    sendingRef.current = true;
+    setBusy(true);
+    setError("");
+    try {
+      const wait = await requestReset(username, lang, captchaRef.current!);
+      setResendAt(Date.now() + wait * 1000);
+      setResendLeft(wait);
       setForgot("sent");
-    });
+    } catch (err) {
+      const none = err instanceof ApiError && err.code === "reset_unavailable";
+      setForgot(none ? "none" : "failed");
+      if (!none) setError(errorText(t, err));
+    } finally {
+      sendingRef.current = false;
+      setBusy(false);
+    }
+  }, [requestReset, username, lang, t]);
+
+  useEffect(() => {
+    if (forgot === "sending") void doSend();
+  }, [forgot, doSend]);
+
+  // Countdown until another email can go out
+  useEffect(() => {
+    const id = setInterval(() => {
+      const left = Math.max(0, Math.ceil((resendAt - Date.now()) / 1000));
+      setResendLeft(left);
+      if (left === 0) clearInterval(id);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [resendAt]);
 
   const editEmail = () => {
     setEmailEdit(true);
@@ -232,24 +267,32 @@ export function AccountDialog({ open, onClose }: Props) {
           </button>
           <div className="row">
             {back}
-            <button type="button" className="link" onClick={onForgot} disabled={forgot === "loading"}>
-              {t("accForgot")}
-            </button>
+            {forgot === "off" && (
+              <button type="button" className="link" onClick={sendReset} disabled={busy}>
+                {t("accForgot")}
+              </button>
+            )}
           </div>
           {forgot === "none" && <p className="acc-hint">{t("accForgotHelp")}</p>}
-          {forgot === "ask" && (
+          {forgot === "sending" && (
             <div className="acc-forgot">
-              <p className="acc-hint">{t("accForgotHint")}</p>
+              <p className="acc-hint" role="status">
+                {t("accForgotSending")}
+              </p>
               <div ref={captchaRef} className="turnstile" />
-              <button type="button" className="btn" onClick={sendReset} disabled={busy}>
-                {t("accForgotSend")}
-              </button>
             </div>
           )}
-          {forgot === "sent" && (
-            <p className="acc-hint acc-sent" role="status">
-              <Rich text={t("accForgotSent", username)} />
-            </p>
+          {(forgot === "sent" || forgot === "failed") && (
+            <div className="acc-forgot">
+              {forgot === "sent" && (
+                <p className="acc-hint acc-sent" role="status">
+                  <Rich text={t("accForgotSent", username)} />
+                </p>
+              )}
+              <button type="button" className="btn" onClick={sendReset} disabled={busy || resendLeft > 0}>
+                {resendLeft > 0 ? t("accResendIn", clockText(resendLeft)) : t("accResend")}
+              </button>
+            </div>
           )}
         </form>
       )}

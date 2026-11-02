@@ -77,8 +77,9 @@ const en = {
   accEmail: "Email (optional, for password reset)",
   accForgot: "I forgot",
   accForgotHelp: "Password reset by email isn't available right now.",
-  accForgotHint: "We'll email a reset link to the address on this account.",
-  accForgotSend: "Email me a reset link",
+  accForgotSending: "Sending a reset link to this account's email…",
+  accResend: "Resend email",
+  accResendIn: (time: string) => `Resend in ${time}`,
   accForgotSent: (n: string) =>
     `If **${n}** has an email, a reset link is on its way. It works for 30 minutes: check spam too.`,
   accEmailIs: (e: string) => `Reset email: **${e}**`,
@@ -301,8 +302,9 @@ const vi: Strings = {
   accEmail: "Email (không bắt buộc, để lấy lại mật khẩu)",
   accForgot: "Quên mật khẩu",
   accForgotHelp: "Hiện chưa lấy lại mật khẩu qua email được.",
-  accForgotHint: "Link đặt lại mật khẩu sẽ được gửi tới email của tài khoản này.",
-  accForgotSend: "Gửi link đặt lại qua email",
+  accForgotSending: "Đang gửi link đặt lại tới email của tài khoản…",
+  accResend: "Gửi lại email",
+  accResendIn: (time) => `Gửi lại sau ${time}`,
   accForgotSent: (n) =>
     `Nếu **${n}** có email, link đặt lại đang được gửi tới. Link dùng được 30 phút: xem cả hộp thư rác nhé.`,
   accEmailIs: (e) => `Email lấy lại mật khẩu: **${e}**`,

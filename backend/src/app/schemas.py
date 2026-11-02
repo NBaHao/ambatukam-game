@@ -171,6 +171,10 @@ class ResetAvailableResponse(BaseModel):
     available: bool
 
 
+class ResetSentResponse(BaseModel):
+    retry_in: int  # seconds before another reset email can go out (the same whether or not one was sent)
+
+
 class ResetRequest(BaseModel):
     username: Username
     captcha: str = Field(max_length=2048)
