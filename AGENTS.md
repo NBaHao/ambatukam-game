@@ -118,7 +118,7 @@ Chrome headless không có WebGL thì MediaPipe lỗi (`activeTexture`); chạy 
 - Tên khoá localStorage trong `frontend/src/lib/storage.ts`: đổi là người chơi mất kỷ lục và mã người chơi.
 - Phiên bản `@mediapipe/tasks-vision` trong `package.json` (ghim cứng) ↔ `MEDIAPIPE_VERSION` ở `src/game/landmarker.ts` (WASM tải từ CDN theo phiên bản này).
 - Mốc cắt mẫu âm thanh trong `frontend/scripts/sound.sh` / `countdown-sfx.sh` ↔ `HYPE_HIT_AT` và nhịp đếm ngược trong `src/game/audio.ts` (đổi file thì nghe lại và đo lại mốc).
-- Đổi luật / ngưỡng chống gian lận: sửa `rules.py` + test trong `backend/tests/`, cập nhật mục chống gian lận trong README.
+- Đổi luật / ngưỡng chống gian lận: sửa `rules.py` + test trong `backend/tests/`, cập nhật mục "Anti-cheat" trong README.
 
 ## Quy ước code
 
@@ -251,3 +251,15 @@ Checklist khi deploy thay đổi lớn:
 4. Đổi widget Turnstile: cập nhật Build variable `VITE_TURNSTILE_SITE_KEY` và Worker secret `TURNSTILE_SECRET` cùng lúc.
 5. Bundle Worker (gzip) phải dưới 3 MB của gói free; `pywrangler deploy --dry-run` in ra kích thước.
 6. Sau deploy: mở trang, chơi một ván, gửi điểm, xem bảng xếp hạng.
+
+### Moderation
+
+List the latest submitted runs (per-run stats are in the `detail` column), then remove a suspicious
+player's scores:
+
+```bash
+cd backend
+uv run pywrangler d1 execute ambatukam-leaderboard --remote --command \
+  "SELECT r.*, s.name FROM runs r LEFT JOIN scores s USING (pid, mode, duration) ORDER BY r.created_at DESC LIMIT 20"
+uv run pywrangler d1 execute ambatukam-leaderboard --remote --command "DELETE FROM scores WHERE pid = '<pid>'"
+```
