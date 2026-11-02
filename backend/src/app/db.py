@@ -230,3 +230,52 @@ class UserRepository:
             .bind(user_id, pw_hash, pw_salt, pw_iter)
             .all()
         )
+
+
+_INSERT_MATCH = """
+INSERT INTO matches (id, room, mode, duration, started_at, ended_at, winner)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, NULLIF(?7, ''))
+ON CONFLICT (id) DO NOTHING
+"""
+
+_INSERT_MATCH_PLAYER = """
+INSERT INTO match_players (match_id, pid, name, registered, strokes, result, status, detail, ended_at)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULLIF(?8, ''), ?9)
+ON CONFLICT (match_id, pid) DO NOTHING
+"""
+
+
+class MatchRepository:
+    def __init__(self, db: D1Database) -> None:
+        self._db = db
+
+    async def record(self, match: dict[str, Any]) -> None:
+        """Store a finished PvP round (see services/room.py `RoomLogic.record`)."""
+        mid, ended = match["id"], match["ended_at"]
+        await self._db.batch(
+            [
+                self._db.prepare(_INSERT_MATCH).bind(
+                    mid,
+                    match["room"],
+                    match["mode"],
+                    match["duration"],
+                    match["started_at"],
+                    ended,
+                    match["winner"] or "",
+                ),
+                *(
+                    self._db.prepare(_INSERT_MATCH_PLAYER).bind(
+                        mid,
+                        p["pid"],
+                        p["name"],
+                        1 if p["registered"] else 0,
+                        p["strokes"],
+                        p["result"],
+                        p["status"],
+                        json.dumps(p["detail"]) if p["detail"] else "",
+                        ended,
+                    )
+                    for p in match["players"]
+                ),
+            ]
+        )

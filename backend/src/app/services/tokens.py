@@ -29,22 +29,14 @@ def new_session(mode: str, duration: int, now_ms: int) -> Session:
 
 
 def sign(secret: str, session: Session) -> str:
-    payload = {"m": session.mode, "d": session.duration, "t": session.started_ms, "n": session.run_id}
-    body = _b64url(json.dumps(payload, separators=(",", ":")).encode())
-    return f"{body}.{_b64url(_mac(secret, body))}"
+    return sign_payload(
+        secret, {"m": session.mode, "d": session.duration, "t": session.started_ms, "n": session.run_id}
+    )
 
 
 def verify(secret: str, token: str) -> Session | None:
-    body, dot, sig = token.partition(".")
-    if not body or not dot or not sig:
-        return None
-    try:
-        if not hmac.compare_digest(_unb64url(sig), _mac(secret, body)):
-            return None
-        p = json.loads(_unb64url(body))
-    except (ValueError, binascii.Error):
-        return None
-    if not isinstance(p, dict):
+    p = verify_payload(secret, token)
+    if p is None or "k" in p:  # "k" marks other kinds of signed payloads (room tickets)
         return None
     mode, duration, started, run_id = p.get("m"), p.get("d"), p.get("t"), p.get("n")
     if not isinstance(mode, str) or not is_valid_duration(mode, duration):
@@ -54,6 +46,25 @@ def verify(secret: str, token: str) -> Session | None:
     if not isinstance(run_id, str) or not run_id:
         return None
     return Session(mode=mode, duration=duration, started_ms=int(started), run_id=run_id)
+
+
+def sign_payload(secret: str, payload: dict[str, object]) -> str:
+    body = _b64url(json.dumps(payload, separators=(",", ":")).encode())
+    return f"{body}.{_b64url(_mac(secret, body))}"
+
+
+def verify_payload(secret: str, token: str) -> dict[str, object] | None:
+    """The signed JSON object, or None if the signature or the format is wrong."""
+    body, dot, sig = token.partition(".")
+    if not body or not dot or not sig:
+        return None
+    try:
+        if not hmac.compare_digest(_unb64url(sig), _mac(secret, body)):
+            return None
+        p = json.loads(_unb64url(body))
+    except (ValueError, binascii.Error):
+        return None
+    return p if isinstance(p, dict) else None
 
 
 def _mac(secret: str, body: str) -> bytes:

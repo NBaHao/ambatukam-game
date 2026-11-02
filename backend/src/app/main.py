@@ -11,6 +11,10 @@
   POST /api/auth/logout                                         → { user: null }
   GET  /api/me                                                  → { user | null }
 
+  POST /api/rooms              { mode, duration, pid, name }    → { code, ticket }
+  POST /api/rooms/{code}/join  { pid, name }                    → { code, ticket }
+  GET  /api/rooms/{code}/ws?ticket=   WebSocket, handled by the PvpRoom Durable Object (src/entry.py)
+
 Tài liệu OpenAPI: /api/docs. Game và API cùng tên miền nên không cần CORS
 (chạy local thì Vite proxy /api sang Worker).
 """

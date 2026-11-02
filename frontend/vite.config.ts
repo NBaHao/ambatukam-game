@@ -28,7 +28,8 @@ export default defineConfig(({ command, mode }) => {
     server: {
       port: 5173,
       // Chạy local: /api chuyển sang Worker FastAPI (`make dev-api`, cổng 8787)
-      proxy: { "/api": env.API_DEV_URL || "http://localhost:8787" },
+      // ws: PvP room sockets (/api/rooms/{code}/ws)
+      proxy: { "/api": { target: env.API_DEV_URL || "http://localhost:8787", ws: true } },
     },
     test: {
       include: ["src/**/*.test.ts"],

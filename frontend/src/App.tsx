@@ -18,6 +18,12 @@ import { useStore } from "./hooks/useStore";
 import { summarize } from "./lib/scoring";
 import { storage } from "./lib/storage";
 import { loadTurnstile } from "./lib/turnstile";
+import { navigate, useRoute } from "./lib/route";
+import { PvpBar } from "./pvp/PvpBar";
+import { PvpLobby } from "./pvp/PvpLobby";
+import { PvpResult } from "./pvp/PvpResult";
+import type { PvpMode } from "./pvp/protocol";
+import { usePvp } from "./pvp/usePvp";
 
 // Chế độ debug chỉ có khi chạy local (vite dev): ?debug&auto=result|play&mode=…
 const params = new URLSearchParams(location.search);
@@ -57,9 +63,31 @@ export function App() {
   const showAccount = accountOpen || (account.welcome && !welcomeDone && !DEBUG);
   const sessionRef = useRef<Promise<string | null>>(Promise.resolve(null));
 
+  // PvP: /c/<code> opens a room; the start screen's PvP button opens the host lobby
+  const route = useRoute();
+  const pvp = usePvp(engine);
+  const pvpRef = useRef(pvp.session);
+  useEffect(() => {
+    pvpRef.current = pvp.session;
+  }, [pvp.session]);
+  const [hostLobby, setHostLobby] = useState(false);
+  const lobby = pvp.entered ? null : route.name === "room" ? "join" : hostLobby ? "host" : null;
+  const { leave: leavePvp } = pvp;
+  // Back button (or any route change) out of the room: leave it
+  useEffect(() => {
+    if (route.name !== "room") leavePvp();
+  }, [route.name, leavePvp]);
+  const exitPvp = useCallback(() => {
+    leavePvp();
+    setHostLobby(false);
+    navigate("/");
+  }, [leavePvp]);
+
   useEffect(() => {
     engine.setHandlers({
+      onSet: () => pvpRef.current?.onSet(),
       onPlayStart: (cfg) => {
+        if (pvpRef.current) return; // PvP results go to the room, not the leaderboard
         // Server ghi lại lúc bắt đầu ván; lỗi mạng thì vẫn chơi, chỉ không gửi được điểm
         sessionRef.current = api
           .createSession({ mode: cfg.mode, duration: isTimed(cfg.mode) ? cfg.duration : 0 })
@@ -67,6 +95,7 @@ export function App() {
         loadTurnstile().catch(() => {});
       },
       onFinish: (run) => {
+        if (pvpRef.current) return pvpRef.current.onFinish(run);
         const prevBest = storage.getBest(run.mode, run.duration);
         if (run.score > prevBest) storage.setBest(run.mode, run.duration, run.score);
         const summary = summarize(run, prevBest);
@@ -80,8 +109,8 @@ export function App() {
 
   // Đang xem bảng xếp hạng / gõ tên / mở hộp tài khoản thì không bắt cử chỉ xòe tay
   useEffect(() => {
-    engine.setGesturesEnabled(view === "game" && !typing && !showAccount);
-  }, [engine, view, typing, showAccount]);
+    engine.setGesturesEnabled(view === "game" && !typing && !showAccount && !lobby);
+  }, [engine, view, typing, showAccount, lobby]);
 
   useEffect(() => {
     if (!DEBUG) return;
@@ -102,14 +131,16 @@ export function App() {
   }, [engine]);
 
   const { phase } = ui;
-  const showGesture = ui.gesture && (phase === "ready" || phase === "anchor" || phase === "countdown");
+  const showGesture =
+    ui.gesture && (phase === "ready" || phase === "anchor" || phase === "waiting" || phase === "countdown");
+  const roomMode = pvp.session?.client.store.get().room?.mode;
   const camStyle = ui.aspect ? ({ "--cam-aspect": ui.aspect } as CSSProperties) : undefined;
 
   return (
     <>
       <Header onAccount={openAccount} />
       <main className="stage">
-        <section className="cam-wrap" style={camStyle}>
+        <section className={pvp.entered ? "cam-wrap pvp" : "cam-wrap"} style={camStyle}>
           <video ref={videoRef} className="cam-video" playsInline muted />
           <canvas ref={canvasRef} className="cam-overlay" />
 
@@ -122,7 +153,24 @@ export function App() {
           ) : (
             <>
               {showGesture && <GestureBar gesture={ui.gesture!} progress={ui.gestureProgress} />}
-              {phase === "idle" && (
+              {lobby && (
+                <PvpLobby
+                  key={lobby + (route.name === "room" ? route.code : "")}
+                  kind={lobby}
+                  code={route.name === "room" ? route.code : undefined}
+                  initialMode={mode === "double" ? "double" : "single"}
+                  initialDuration={duration}
+                  onOpen={(code, ticket) => {
+                    setHostLobby(false);
+                    pvp.open(code, ticket);
+                  }}
+                  onCancel={exitPvp}
+                  onLogin={openAccount}
+                  onTypingChange={setTyping}
+                />
+              )}
+              {pvp.session && <PvpBar session={pvp.session} engine={engine} phase={phase} onLeave={exitPvp} />}
+              {phase === "idle" && !lobby && !pvp.entered && (
                 <StartScreen
                   mode={mode}
                   duration={duration}
@@ -130,6 +178,7 @@ export function App() {
                   onDurationChange={setDuration}
                   onStart={() => void engine.begin({ mode, duration })}
                   onOpenBoard={() => setView("board")}
+                  onPvp={() => setHostLobby(true)}
                 />
               )}
               {phase === "ready" && <ReadyScreen boot={ui.boot} />}
@@ -138,14 +187,14 @@ export function App() {
             </>
           )}
         </section>
-        <PowerBar engine={engine} mode={mode} />
+        <PowerBar engine={engine} mode={(roomMode as PvpMode | undefined) ?? mode} />
       </main>
 
       {finished && (
         <ResultDialog
           key={finished.id}
           finished={finished}
-          open={phase === "result" && view === "game"}
+          open={phase === "result" && view === "game" && !pvp.entered}
           replayProgress={ui.replayProgress}
           onAgain={() => engine.replay()}
           onClose={goHome}
@@ -154,6 +203,10 @@ export function App() {
           onTypingChange={setTyping}
           forceCelebrate={DEBUG && params.get("auto") === "top10"}
         />
+      )}
+
+      {pvp.session && (
+        <PvpResult session={pvp.session} engine={engine} open={phase === "result" && view === "game"} onLeave={exitPvp} />
       )}
 
       <AccountDialog key={accountKey} open={showAccount} onClose={closeAccount} />

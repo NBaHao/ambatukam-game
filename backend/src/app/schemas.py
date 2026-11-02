@@ -1,6 +1,6 @@
 """Request / response của API. Lỗi kiểu dữ liệu → 422 {"error": "invalid_request"}."""
 
-from typing import Annotated, Self
+from typing import Annotated, Literal, Self
 
 from pydantic import (
     AfterValidator,
@@ -17,6 +17,7 @@ from app.rules import (
     PASSWORD_MAX,
     PASSWORD_MIN,
     RESERVED_PREFIX,
+    ROOM_CODE_PATTERN,
     USERNAME_PATTERN,
     Mode,
     is_valid_duration,
@@ -71,6 +72,43 @@ class ScoreRequest(BaseModel):
     fps: FiniteFloat
     grip: Count
     split: list[Count] | None = Field(default=None, max_length=2)  # double
+
+
+class PvpFinal(BaseModel):
+    """A finished PvP run, sent over the room socket (same stats as a solo score)."""
+
+    strokes: Count
+    bins: list[Count] = Field(max_length=60)
+    fps: FiniteFloat
+    grip: Count
+    split: list[Count] | None = Field(default=None, max_length=2)
+
+
+PvpMode = Literal["single", "double"]
+RoomCode = Annotated[str, Field(pattern=ROOM_CODE_PATTERN)]
+
+
+class CreateRoomRequest(BaseModel):
+    mode: PvpMode
+    duration: StrictInt
+    pid: PlayerId
+    name: PlayerName  # ignored when logged in: the username is used
+
+    @model_validator(mode="after")
+    def _duration_matches_mode(self) -> Self:
+        if not is_valid_duration(self.mode, self.duration):
+            raise ValueError("duration is not valid for this mode")
+        return self
+
+
+class JoinRoomRequest(BaseModel):
+    pid: PlayerId
+    name: PlayerName
+
+
+class RoomTicketResponse(BaseModel):
+    code: str
+    ticket: str  # connect to /api/rooms/{code}/ws?ticket=…
 
 
 class RankResponse(BaseModel):

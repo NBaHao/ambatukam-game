@@ -66,6 +66,11 @@ export interface LoginRequest {
   password: string;
 }
 
+export interface RoomTicket {
+  code: string;
+  ticket: string;
+}
+
 /** Luật tên / mật khẩu, khớp backend/src/app/rules.py */
 export const USERNAME_RE = /^[a-z0-9_-]{3,16}$/;
 export const RESERVED_PREFIX = "guest";

@@ -6,6 +6,7 @@ import type {
   MeResponse,
   RankResponse,
   RegisterRequest,
+  RoomTicket,
   ScoreRequest,
   SessionRequest,
 } from "./types";
@@ -54,4 +55,10 @@ export const api = {
   register: (body: RegisterRequest) => post<MeResponse>("/api/auth/register", body),
   login: (body: LoginRequest) => post<MeResponse>("/api/auth/login", body),
   logout: () => post<MeResponse>("/api/auth/logout", {}),
+
+  // PvP: a signed ticket for the room socket (roomSocketUrl in src/pvp/RoomClient.ts)
+  createRoom: (body: { mode: string; duration: number; pid: string; name: string }) =>
+    post<RoomTicket>("/api/rooms", body),
+  joinRoom: (code: string, body: { pid: string; name: string }) =>
+    post<RoomTicket>(`/api/rooms/${encodeURIComponent(code)}/join`, body),
 };

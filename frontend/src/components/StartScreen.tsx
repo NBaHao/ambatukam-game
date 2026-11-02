@@ -20,9 +20,10 @@ interface Props {
   onDurationChange: (duration: Duration) => void;
   onStart: () => void;
   onOpenBoard: () => void;
+  onPvp: () => void;
 }
 
-export function StartScreen({ mode, duration, onModeChange, onDurationChange, onStart, onOpenBoard }: Props) {
+export function StartScreen({ mode, duration, onModeChange, onDurationChange, onStart, onOpenBoard, onPvp }: Props) {
   const { t } = useI18n();
   const best = storage.getBest(mode, duration);
   const bestLine = !best ? "" : isTimed(mode) ? t("bestLine", best, duration) : t("bestLineRandom", best);
@@ -49,12 +50,14 @@ export function StartScreen({ mode, duration, onModeChange, onDurationChange, on
             <span>{t(MODE_TEXT[m].desc)}</span>
           </button>
         ))}
-        {(["modeRank", "modePvp"] as const).map((k) => (
-          <button key={k} type="button" disabled>
-            <b>{t(k)}</b>
-            <span>{t("soon")}</span>
-          </button>
-        ))}
+        <button type="button" disabled>
+          <b>{t("modeRank")}</b>
+          <span>{t("soon")}</span>
+        </button>
+        <button type="button" onClick={onPvp}>
+          <b>{t("modePvp")}</b>
+          <span>{t("modePvpDesc")}</span>
+        </button>
       </div>
       <p className="sub">{t(MODE_TEXT[mode].sub)}</p>
       <SegmentedControl
