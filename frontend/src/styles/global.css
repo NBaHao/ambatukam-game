@@ -104,6 +104,11 @@ button:disabled { opacity: .4; cursor: default; }
   overflow: hidden;
 }
 
+/* Fixed cells so the PvP room card can share the camera's cell (overlaid at its bottom) */
+.stage > .cam-wrap, .stage > .pvp-card { grid-area: 1 / 1; }
+.stage > .pvp-card { align-self: end; justify-self: center; }
+.stage > .power { grid-area: 1 / 2; }
+
 .cam-video, .cam-overlay {
   position: absolute; inset: 0;
   width: 100%; height: 100%;
@@ -158,4 +163,12 @@ button:disabled { opacity: .4; cursor: default; }
   h1 { font-size: 22px; }
   h2 { font-size: 20px; }
   .countdown { font-size: 100px; }
+  /* Phones stack camera, room card and power bar */
+  .stage > .cam-wrap, .stage > .pvp-card, .stage > .power { grid-area: auto; }
+}
+
+/* Phones and short landscape screens: menus grow with their content instead of scrolling inside the camera box */
+@media (max-width: 640px), (max-height: 500px) {
+  .cam-wrap:has(> .screen-start, > .pvp-lobby) { overflow: visible; display: flex; flex-direction: column; }
+  .cam-wrap > .screen-start, .cam-wrap > .pvp-lobby { position: relative; flex: 1 0 auto; border-radius: inherit; }
 }

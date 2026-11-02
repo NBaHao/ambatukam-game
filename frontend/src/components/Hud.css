@@ -23,3 +23,10 @@
   .hud-status { white-space: normal; width: max-content; max-width: 60%; text-align: center; }
   .hud-count { font-size: 64px; }
 }
+
+/* PvP: the opponent tile holds the top left, so the clock moves right and warnings stay between them */
+.cam-wrap.pvp .hud-timer { left: auto; right: 12px; }
+.cam-wrap.pvp .hud-status { white-space: normal; width: max-content; max-width: calc(100% - 2 * var(--pvp-side)); text-align: center; }
+@media (max-width: 640px) {
+  .cam-wrap.pvp .hud-timer { top: 8px; right: 8px; }
+}

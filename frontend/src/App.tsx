@@ -23,7 +23,7 @@ import { summarize } from "./lib/scoring";
 import { storage } from "./lib/storage";
 import { loadTurnstile } from "./lib/turnstile";
 import { navigate, roomPath, useRoute } from "./lib/route";
-import { PvpBar } from "./pvp/PvpBar";
+import { PvpBar, PvpRoomCard } from "./pvp/PvpBar";
 import { PvpLobby } from "./pvp/PvpLobby";
 import { PvpMedia } from "./pvp/PvpMedia";
 import { PvpResult } from "./pvp/PvpResult";
@@ -177,8 +177,9 @@ export function App() {
   return (
     <>
       <Header onAccount={openAccount} onFriends={() => setFriendsOpen(true)} />
-      <main className="stage">
-        <section className={pvp.entered ? "cam-wrap pvp" : "cam-wrap"} style={camStyle}>
+      {/* On the stage, not the camera, so the PvP room card sizes itself like the camera too */}
+      <main className="stage" style={camStyle}>
+        <section className={pvp.entered ? "cam-wrap pvp" : "cam-wrap"}>
           <video ref={videoRef} className="cam-video" playsInline muted />
           <canvas ref={canvasRef} className="cam-overlay" />
 
@@ -220,7 +221,7 @@ export function App() {
                 />
               )}
               {pvp.session && (
-                <PvpBar session={pvp.session} engine={engine} phase={phase} autoInvite={autoInvite} onLeave={exitPvp} />
+                <PvpBar session={pvp.session} engine={engine} phase={phase} onLeave={exitPvp} />
               )}
               {phase === "idle" && !lobby && !pvp.entered && (
                 <StartScreen
@@ -239,6 +240,9 @@ export function App() {
             </>
           )}
         </section>
+        {pvp.session && view === "game" && route.name !== "profile" && (
+          <PvpRoomCard session={pvp.session} phase={phase} autoInvite={autoInvite} onLeave={exitPvp} />
+        )}
         <PowerBar engine={engine} mode={(roomMode as PvpMode | undefined) ?? mode} />
       </main>
 
