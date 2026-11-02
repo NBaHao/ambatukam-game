@@ -24,6 +24,10 @@ export function parseRoute(path: string): Route {
 }
 
 export const roomPath = (code: string) => `/c/${code}`;
+/** The link a host sends. `?lang=vi` makes the Worker write the link preview in Vietnamese
+ *  (backend/src/app/services/invite_preview.py); the app itself ignores it */
+export const inviteUrl = (code: string, lang: string, origin = location.origin) =>
+  new URL(roomPath(code) + (lang === "vi" ? "?lang=vi" : ""), origin).toString();
 export const profilePath = (username: string) => `/u/${username}`;
 
 const subscribe = (cb: () => void) => {

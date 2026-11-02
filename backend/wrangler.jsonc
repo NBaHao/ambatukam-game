@@ -8,8 +8,10 @@
   "compatibility_flags": ["python_workers"],
   "assets": {
     "directory": "../frontend/dist",
-    "run_worker_first": ["/api/*"],
-    // /c/<code> (challenge links), /u/<name> (profiles): serve index.html, the app reads the path
+    "binding": "ASSETS",
+    // /c/<code> (challenge links) goes through the Worker too, to put the room in the link preview (entry.py)
+    "run_worker_first": ["/api/*", "/c/*"],
+    // /u/<name> (profiles) and other app paths: serve index.html, the app reads the path
     "not_found_handling": "single-page-application"
   },
   // Tên miền riêng: Cloudflare tự tạo bản ghi DNS + chứng chỉ SSL khi deploy (zone bahao.site nằm trên Cloudflare).

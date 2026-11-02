@@ -9,6 +9,9 @@ Client → server: {"t": "ping", "c": ms} | {"t": "ready", "v": bool} | {"t": "p
                  | {"t": "signal", "d": {...}} (WebRTC offer / answer / candidate)
 Server → client: {"t": "state", ...} | {"t": "progress", "seat", "n"} | {"t": "result", ...}
                  | {"t": "signal", "d"} | {"t": "pong", "c", "s"} | {"t": "error", "code"}
+
+A plain GET …/preview (only from the Worker, never routed from outside) returns the room's public
+preview as JSON, or null, for invite link previews.
 """
 
 import contextlib
@@ -87,9 +90,12 @@ class PvpRoom(DurableObject):
                 _try_send(ws, data)
 
     async def fetch(self, request: Any) -> Any:
+        url = urlsplit(request.url)
+        if url.path.endswith("/preview"):  # the Worker, building an invite link preview (entry.py)
+            room = await self._room()
+            return Response.new(json.dumps(room.preview()))
         if request.headers.get("Upgrade") != "websocket":
             return Response.new("expected websocket", status=426)
-        url = urlsplit(request.url)
         code = url.path.rstrip("/").split("/")[-2]
         token = parse_qs(url.query).get("ticket", [""])[0]
         now = clock.now_ms()
