@@ -164,6 +164,27 @@ class User(BaseModel):
     username: str
     pid: str  # the client stores this as its player id
     created_at: int
+    email: str | None = None  # only ever sent to the account itself (/api/me)
+
+
+class ResetAvailableResponse(BaseModel):
+    available: bool
+
+
+class ResetRequest(BaseModel):
+    username: Username
+    captcha: str = Field(max_length=2048)
+    lang: Literal["en", "vi"] = "en"
+
+
+class ResetComplete(BaseModel):
+    token: str = Field(min_length=1, max_length=128)
+    password: Password
+
+
+class EmailChange(BaseModel):
+    email: Email | None
+    password: Annotated[str, Field(min_length=1, max_length=PASSWORD_MAX)]
 
 
 class MeResponse(BaseModel):

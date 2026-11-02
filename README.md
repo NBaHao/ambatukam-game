@@ -81,6 +81,10 @@ API (`backend/src/app/routers/`, tài liệu OpenAPI ở `/api/docs`):
 | `POST /api/auth/login` `{ username, password }` | Log in, sets the session cookie |
 | `POST /api/auth/logout` | Log out |
 | `GET /api/me` | The logged-in account (or `null`), renews the session |
+| `PUT /api/me/email` `{ email \| null, password }` | Add, change or remove the reset email (needs the current password) |
+| `GET /api/auth/reset` | `{ available }`: whether reset emails can be sent |
+| `POST /api/auth/reset/request` `{ username, captcha, lang }` | Email a reset link if the account has an email (same answer either way) |
+| `POST /api/auth/reset` `{ token, password }` | New password from the link: logs out every device, logs this one in |
 | `GET /api/users/{username}` | Public profile: best score per board with rank, PvP totals, latest 20 matches |
 | `POST /api/rooms` `{ mode, duration, pid, name }` | Create a PvP room: `{ code, ticket }` |
 | `POST /api/rooms/{code}/join` `{ pid, name }` | Ticket to join a room |
@@ -98,7 +102,9 @@ Same model as TETR.IO, no OAuth or passkeys:
 
 - One username box. Blank means guest: play and submit scores exactly as before.
 - Unknown username: "want to join?" → stay anonymous, or register with a password (twice) and an optional email.
-- Known username: password → log in. "I forgot" only explains that email reset isn't available yet.
+- Known username: password → log in. "I forgot" emails a reset link to the account's address (see below).
+- The account menu shows the reset email; add, change or remove it there (asks for the current password,
+  so a stolen session can't point resets at another inbox).
 - Registering moves the device's player id (and its scores) into the account. Logging in on another
   device switches that device to the account's player id; logging out gives it a fresh guest id.
 - Logged-in scores always use the account's username. Guests can't submit under a registered username
@@ -114,6 +120,14 @@ They last 30 days and `/api/me` renews them. Each login drops the account's expi
 only the newest `MAX_SESSIONS` (10).
 Rate limits: register and login share a per-IP limit (`AUTH_LIMIT`); login also has a per-username
 limit across all IPs (`LOGIN_NAME_LIMIT`, 10 per minute) against spread-out password guessing.
+
+Password reset (optional, needs the `RESEND_API_KEY` secret; without it "I forgot" says reset isn't
+available): the email is sent through [Resend](https://resend.com) from `MAIL_FROM` (its domain must be
+verified in Resend). The link `/reset/<token>` works once, for `RESET_TTL_MIN` (30) minutes, and only the
+newest link of an account works; D1 stores only the token's SHA-256. Asking needs a Turnstile check, counts
+against `AUTH_LIMIT` and `LOGIN_NAME_LIMIT`, sends at most one email per account every `RESET_GAP_SEC`
+(2 minutes), and answers the same whether or not the account exists or has an email. Setting the new
+password ends every session of the account. Links always point at `APP_ORIGIN`, never the request's host.
 
 ## Profiles
 
@@ -273,7 +287,7 @@ MIT
 
 ## English
 
-Webcam meme game: grip like you're holding a rod, stroke up and down as fast as you can. Three modes: **Single** (1 hand, timed, average strokes/sec), **Double** (2 hands, 2 rods, strokes add up), **Random** (the rod spawns at random spots and keeps relocating; chase it to keep your Heat meter up, survive as long as you can). **PvP**: send a challenge link, challenge an online friend, or get paired with a random opponent, and race on the same clock. Accounts get a public profile and a friend list. Rank is coming soon.
+Webcam meme game: grip like you're holding a rod, stroke up and down as fast as you can. Three modes: **Single** (1 hand, timed, average strokes/sec), **Double** (2 hands, 2 rods, strokes add up), **Random** (the rod spawns at random spots and keeps relocating; chase it to keep your Heat meter up, survive as long as you can). **PvP**: send a challenge link, challenge an online friend, or get paired with a random opponent, and race on the same clock. Accounts get a public profile, a friend list and password reset by email. Rank is coming soon.
 
 Hand tracking runs entirely in the browser; video never leaves the device. The backend (Cloudflare Workers + D1 + Durable Objects) only handles the leaderboard, accounts, friends and PvP rooms; it receives names, scores and stroke counts, never video. For fun, 16+, no explicit imagery.
 

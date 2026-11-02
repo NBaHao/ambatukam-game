@@ -15,3 +15,11 @@ TURNSTILE_SECRET=1x0000000000000000000000000000000AA
 # Without them the camera / mic toggles stay hidden. Locally, RTC_ALLOW_DIRECT=1 tries WebRTC without
 # TURN (direct connections show each player's IP to the other: never set it in production).
 RTC_ALLOW_DIRECT=1
+
+# Password reset by email (optional). Production: verify a sending domain in Resend, then
+#   uv run pywrangler secret put RESEND_API_KEY
+#   (and MAIL_FROM, e.g. "Ambatukam <noreply@your-domain>", if not the default)
+# Without RESEND_API_KEY, "forgot password" shows the old help text. Locally, MAIL_DEV_LOG=1 prints
+# the email (with the link) to the worker log instead; APP_ORIGIN is where the link points.
+MAIL_DEV_LOG=1
+APP_ORIGIN=http://localhost:5173

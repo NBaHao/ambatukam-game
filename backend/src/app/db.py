@@ -231,6 +231,71 @@ class UserRepository:
             .all()
         )
 
+    async def set_email(self, user_id: str, email: str | None) -> None:
+        await self._db.prepare("UPDATE users SET email = ?2 WHERE id = ?1").bind(user_id, email or "").all()
+
+    async def last_reset_at(self, user_id: str) -> int | None:
+        rows = _rows(
+            await self._db.prepare("SELECT MAX(created_at) AS at FROM password_resets WHERE user_id = ?1")
+            .bind(user_id)
+            .all()
+        )
+        return rows[0]["at"] if rows else None
+
+    async def create_reset(self, token_hash: str, user_id: str, now: int, expires_at: int) -> None:
+        """Store a reset link; older unused links of the account stop working."""
+        await self._db.batch(
+            [
+                self._db.prepare(
+                    "DELETE FROM password_resets "
+                    "WHERE user_id = ?1 AND (used_at IS NOT NULL OR expires_at <= ?2)"
+                ).bind(user_id, now),
+                self._db.prepare(
+                    "UPDATE password_resets SET expires_at = ?2 WHERE user_id = ?1 AND expires_at > ?2"
+                ).bind(user_id, now),
+                self._db.prepare(
+                    "INSERT INTO password_resets (token_hash, user_id, created_at, expires_at) "
+                    "VALUES (?1, ?2, ?3, ?4)"
+                ).bind(token_hash, user_id, now, expires_at),
+            ]
+        )
+
+    async def use_reset(self, token_hash: str, now: int) -> str | None:
+        """Mark a valid link as used and return its account id (None if unknown, used or expired)."""
+        rows = _rows(
+            await self._db.prepare(
+                "UPDATE password_resets SET used_at = ?2 "
+                "WHERE token_hash = ?1 AND used_at IS NULL AND expires_at > ?2 RETURNING user_id"
+            )
+            .bind(token_hash, now)
+            .all()
+        )
+        return rows[0]["user_id"] if rows else None
+
+    async def reset_password(
+        self,
+        user_id: str,
+        pw_hash: str,
+        pw_salt: str,
+        pw_iter: int,
+        token_hash: str,
+        now: int,
+        expires_at: int,
+    ) -> None:
+        """New password, every session ends (a thief is logged out), then one new session."""
+        await self._db.batch(
+            [
+                self._db.prepare(
+                    "UPDATE users SET pw_hash = ?2, pw_salt = ?3, pw_iter = ?4 WHERE id = ?1"
+                ).bind(user_id, pw_hash, pw_salt, pw_iter),
+                self._db.prepare("DELETE FROM sessions WHERE user_id = ?1").bind(user_id),
+                self._db.prepare(_INSERT_SESSION).bind(token_hash, user_id, now, expires_at),
+            ]
+        )
+
+    async def by_id(self, user_id: str) -> dict[str, Any] | None:
+        return await self._user(f"SELECT {_USER_COLS} FROM users WHERE id = ?1", user_id)
+
 
 _INSERT_MATCH = """
 INSERT INTO matches (id, room, mode, duration, started_at, ended_at, winner)

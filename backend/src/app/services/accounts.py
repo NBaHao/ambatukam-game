@@ -38,7 +38,13 @@ def name_key(name: str) -> str:
 
 
 def public_user(user: dict[str, Any]) -> dict[str, Any]:
-    return {"username": user["username"], "pid": user["pid"], "created_at": user["created_at"]}
+    """The account as its owner sees it (/api/me): never shown to anyone else."""
+    return {
+        "username": user["username"],
+        "pid": user["pid"],
+        "created_at": user["created_at"],
+        "email": user.get("email") or None,
+    }
 
 
 async def register(

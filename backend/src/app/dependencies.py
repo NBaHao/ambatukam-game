@@ -10,7 +10,7 @@ from app import clock
 from app.config import Settings
 from app.db import FriendRepository, ProfileRepository, ScoreRepository, UserRepository
 from app.errors import ApiError
-from app.services import accounts, passwords, rtc, turnstile
+from app.services import accounts, mailer, passwords, rtc, turnstile
 
 HumanVerifier = Callable[[str], Awaitable[bool]]
 
@@ -54,6 +54,13 @@ async def get_session(
     return await accounts.current_session(users, amb_sid, clock.now_ms())
 
 
+def get_mailer(settings: Annotated[Settings, Depends(get_settings)]) -> mailer.Send | None:
+    """None when email isn't set up (no RESEND_API_KEY)."""
+    if settings.resend_api_key:
+        return mailer.resend_sender(settings.resend_api_key, settings.mail_from)
+    return mailer.log_sender if settings.mail_dev_log else None
+
+
 def get_turn_post() -> rtc.PostJson:
     return rtc.workers_post_json
 
@@ -84,6 +91,7 @@ UsersDep = Annotated[UserRepository, Depends(get_users)]
 ProfilesDep = Annotated[ProfileRepository, Depends(get_profiles)]
 FriendsDep = Annotated[FriendRepository, Depends(get_friends)]
 KdfDep = Annotated[passwords.Kdf, Depends(get_kdf)]
+MailerDep = Annotated[mailer.Send | None, Depends(get_mailer)]
 SessionDep = Annotated[accounts.Session | None, Depends(get_session)]
 
 

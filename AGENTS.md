@@ -34,7 +34,7 @@ backend/                 FastAPI trên Cloudflare Python Workers (quản lý b�
   src/lobby_room.py      Lobby (Durable Object, one instance): presence, PvP invites, matchmaking; rules in services/lobby.py
   src/app/main.py        create_app(): router, error handler, /api/docs
   src/app/routers/       sessions, scores, leaderboard, auth, rooms, profiles, friends, lobby
-  src/app/services/      tokens (HMAC), anticheat, turnstile, names, accounts, passwords (PBKDF2), tickets, room,
+  src/app/services/      tokens (HMAC), anticheat, turnstile, names, accounts, passwords (PBKDF2), tickets, room, rtc, resets, mailer,
                          profiles, friends, lobby
   src/app/db.py          ScoreRepository, UserRepository trên D1
   src/app/rules.py       Hằng số luật chơi / chống gian lận
@@ -69,6 +69,7 @@ Khi thêm biến mới: thêm vào `.env.example`, khai báo kiểu trong `src/v
 | `TOKEN_SECRET` | `cd backend && openssl rand -hex 32 \| uv run pywrangler secret put TOKEN_SECRET` | `backend/.dev.vars` |
 | `TURNSTILE_SECRET` | `cd backend && uv run pywrangler secret put TURNSTILE_SECRET` (Cloudflare dashboard → Turnstile → widget) | `backend/.dev.vars` (khoá thử `1x0000000000000000000000000000000AA`) |
 | `TURN_KEY_ID`, `TURN_KEY_API_TOKEN` (optional: PvP video / voice) | Cloudflare dashboard → Realtime → TURN → create key, then `uv run pywrangler secret put` each | not needed: `RTC_ALLOW_DIRECT=1` in `.dev.vars` tries WebRTC without TURN (never in production: it exposes IPs) |
+| `RESEND_API_KEY` (optional: password reset email), `MAIL_FROM` (optional, default `Ambatukam <noreply@bahao.site>`) | Resend dashboard → verify the sending domain → API key, then `uv run pywrangler secret put RESEND_API_KEY` | not needed: `MAIL_DEV_LOG=1` prints the email (with the link) to the worker log; `APP_ORIGIN` sets where links point (default `https://ambatukam.bahao.site`) |
 
 `backend/.dev.vars` đã gitignore; `make install` tạo từ `backend/.dev.vars.example`. Đọc secret qua `Settings.from_env` (`src/app/config.py`), thiếu thì lỗi 500 rõ ràng (optional secrets such as TURN just turn their feature off).
 Không in secret ra log, không dán vào issue/PR.
@@ -105,7 +106,7 @@ Chrome headless không có WebGL thì MediaPipe lỗi (`activeTexture`); chạy 
 
 - `RND_METER_START / RND_DRAIN_BASE / RND_DRAIN_RAMP / RND_STROKE_GAIN` ở `frontend/src/game/constants.ts` ↔ `RND_START / RND_DRAIN / RND_RAMP / RND_GAIN` ở `backend/src/app/rules.py` (server dựng lại thanh Lửa để kiểm tra).
 - Kiểu trong `frontend/src/api/types.ts` ↔ `backend/src/app/schemas.py`; mã lỗi `REJECTED_CODES` ↔ các `ApiError(...)` trong `routers/scores.py`.
-- Account rules: `USERNAME_RE`, `RESERVED_PREFIX`, `PASSWORD_MIN/MAX` in `frontend/src/api/types.ts` ↔ `rules.py`; error codes in `AccountDialog.tsx` / `useScoreSubmission.ts` ↔ `ApiError(...)` in `services/accounts.py` and `routers/auth.py`; friend error codes in `FriendsDialog.tsx` ↔ `services/friends.py`.
+- Account rules: `USERNAME_RE`, `RESERVED_PREFIX`, `PASSWORD_MIN/MAX` in `frontend/src/api/types.ts` ↔ `rules.py`; error codes in `AccountDialog.tsx` / `ResetDialog.tsx` / `useScoreSubmission.ts` ↔ `ApiError(...)` in `services/accounts.py`, `services/resets.py` and `routers/auth.py`; the `/reset/<token>` pattern in `lib/route.ts` ↔ the link built in `services/resets.py`; friend error codes in `FriendsDialog.tsx` ↔ `services/friends.py`.
 - PvP socket messages: `frontend/src/pvp/protocol.ts` ↔ `backend/src/app/services/room.py` / `src/pvp_room.py`
   (state, progress, result, media, signal, pong, error; close codes 4000/4001). Room code format: `ROOM_CODE_*` in `rules.py`
   ↔ the `/c/` pattern in `frontend/src/lib/route.ts`. `PVP_START_DELAY_MS` must stay longer than the client

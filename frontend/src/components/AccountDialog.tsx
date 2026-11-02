@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useAccount } from "../account/context";
-import { ApiError } from "../api/client";
+import { ApiError, api } from "../api/client";
 import { PASSWORD_MAX, PASSWORD_MIN, RESERVED_PREFIX, USERNAME_RE } from "../api/types";
 import { useI18n, type Translate } from "../i18n/context";
 import { Rich } from "../i18n/Rich";
@@ -13,6 +13,10 @@ import "./AccountDialog.css";
  * Trống → khách. Tên đã có → nhập mật khẩu. Tên chưa có → "tạo tài khoản?" → email (tuỳ chọn) + mật khẩu ×2.
  */
 type Step = "name" | "login" | "join" | "register" | "me";
+/** "I forgot": checking whether the server can email, then asking / sent, or "none" (old help text) */
+type Forgot = "off" | "loading" | "ask" | "sent" | "none";
+
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 interface Props {
   open: boolean;
@@ -32,6 +36,9 @@ function errorText(t: Translate, err: unknown): string {
     if (err.code === "username_taken") return t("accErrTaken");
     if (err.code === "rate_limited") return t("accErrLimit");
     if (err.code === "captcha") return t("submitCaptcha");
+    if (err.code === "email_failed") return t("accErrMail");
+    if (err.code === "reset_unavailable") return t("accForgotHelp");
+    if (err.code === "bad_reset") return t("resetBad");
   }
   return t("accErrNet");
 }
@@ -50,12 +57,16 @@ export function AccountDialog({ open, onClose }: Props) {
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [forgot, setForgot] = useState(false);
+  const [forgot, setForgot] = useState<Forgot>("off");
+  const [emailEdit, setEmailEdit] = useState(false);
+  const [notice, setNotice] = useState("");
 
   const go = (next: Step) => {
     setStep(next);
     setError("");
-    setForgot(false);
+    setNotice("");
+    setForgot("off");
+    setEmailEdit(false);
     setPassword("");
     setPassword2("");
   };
@@ -119,10 +130,46 @@ export function AccountDialog({ open, onClose }: Props) {
     if (password.length < PASSWORD_MIN) return setError(t("accErrShort", PASSWORD_MIN));
     if (password !== password2) return setError(t("accErrMatch"));
     const mail = email.trim();
-    if (mail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)) return setError(t("accErrEmail"));
+    if (mail && !EMAIL_RE.test(mail)) return setError(t("accErrEmail"));
     void run(async () => {
       await account.register({ username, password, email: mail }, captchaRef.current!);
       close();
+    });
+  };
+
+  const onForgot = () => {
+    if (forgot !== "off") return;
+    setForgot("loading");
+    api
+      .resetAvailable()
+      .then((ok) => setForgot(ok ? "ask" : "none"))
+      .catch(() => setForgot("none"));
+  };
+
+  const sendReset = () =>
+    void run(async () => {
+      await account.requestReset(username, lang, captchaRef.current!);
+      setForgot("sent");
+    });
+
+  const editEmail = () => {
+    setEmailEdit(true);
+    setEmail(account.user?.email ?? "");
+    setPassword("");
+    setError("");
+    setNotice("");
+  };
+
+  const onEmail = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const remove = (e.nativeEvent as SubmitEvent).submitter?.getAttribute("name") === "remove";
+    const mail = remove ? "" : email.trim();
+    if (mail && !EMAIL_RE.test(mail)) return setError(t("accErrEmail"));
+    void run(async () => {
+      await account.changeEmail(mail || null, password);
+      setEmailEdit(false);
+      setPassword("");
+      setNotice(t("accEmailSaved"));
     });
   };
 
@@ -185,11 +232,25 @@ export function AccountDialog({ open, onClose }: Props) {
           </button>
           <div className="row">
             {back}
-            <button type="button" className="link" onClick={() => setForgot(true)}>
+            <button type="button" className="link" onClick={onForgot} disabled={forgot === "loading"}>
               {t("accForgot")}
             </button>
           </div>
-          {forgot && <p className="acc-hint">{t("accForgotHelp")}</p>}
+          {forgot === "none" && <p className="acc-hint">{t("accForgotHelp")}</p>}
+          {forgot === "ask" && (
+            <div className="acc-forgot">
+              <p className="acc-hint">{t("accForgotHint")}</p>
+              <div ref={captchaRef} className="turnstile" />
+              <button type="button" className="btn" onClick={sendReset} disabled={busy}>
+                {t("accForgotSend")}
+              </button>
+            </div>
+          )}
+          {forgot === "sent" && (
+            <p className="acc-hint acc-sent" role="status">
+              <Rich text={t("accForgotSent", username)} />
+            </p>
+          )}
         </form>
       )}
 
@@ -259,6 +320,49 @@ export function AccountDialog({ open, onClose }: Props) {
           })}>
             {t("accLogout")}
           </button>
+          {emailEdit ? (
+            <form className="acc-email" onSubmit={onEmail}>
+              <input type="text" value={account.user.username} autoComplete="username" readOnly hidden />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder={t("accEmailPh")}
+                aria-label={t("accEmailPh")}
+                autoComplete="email"
+                maxLength={254}
+                required
+              />
+              {pw(password, setPassword, t("accPasswordNow"), "current-password")}
+              <button className="btn primary" disabled={busy}>
+                {t("accSave")}
+              </button>
+              <div className="row">
+                <button type="button" className="link" onClick={() => setEmailEdit(false)} disabled={busy}>
+                  {t("back")}
+                </button>
+                {account.user.email && (
+                  <button name="remove" formNoValidate className="link" disabled={busy || !password}>
+                    {t("accEmailRemove")}
+                  </button>
+                )}
+              </div>
+            </form>
+          ) : (
+            <div className="acc-email">
+              <p className="acc-hint">
+                {account.user.email ? <Rich text={t("accEmailIs", account.user.email)} /> : t("accEmailNone")}
+              </p>
+              <button type="button" className="link" onClick={editEmail}>
+                {t(account.user.email ? "accEmailChange" : "accEmailAdd")}
+              </button>
+            </div>
+          )}
+          {notice && (
+            <p className="acc-hint acc-sent" role="status">
+              {notice}
+            </p>
+          )}
         </div>
       )}
 
