@@ -36,6 +36,8 @@ PASSWORD_MAX = 128
 PW_ITERATIONS = 100_000
 SESSION_DAYS = 30
 SESSION_RENEW_DAYS = 15  # /api/me pushes the expiry forward once fewer days than this remain
+RESET_TTL_MIN = 30  # a password reset link works this long, once
+RESET_GAP_SEC = 120  # at most one reset email per account per 2 minutes
 MAX_SESSIONS = 10  # per account; logging in on an 11th device ends the oldest session
 
 # PvP rooms (challenge links). Only the timed modes: both players race the same clock.

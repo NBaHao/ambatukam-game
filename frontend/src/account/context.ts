@@ -13,6 +13,12 @@ export interface Account {
   /** `captchaEl`: chỗ Turnstile vẽ ô tick nếu cần */
   register: (form: { username: string; password: string; email: string }, captchaEl: HTMLElement) => Promise<void>;
   logout: () => Promise<void>;
+  /** Email a reset link (if the account has an email). `captchaEl` as in register */
+  requestReset: (username: string, lang: string, captchaEl: HTMLElement) => Promise<void>;
+  /** New password from an email link: logs out other devices, logs this one in */
+  completeReset: (token: string, password: string) => Promise<void>;
+  /** Add / change / remove the reset email (needs the current password) */
+  changeEmail: (email: string | null, password: string) => Promise<void>;
 }
 
 export const AccountContext = createContext<Account | null>(null);
