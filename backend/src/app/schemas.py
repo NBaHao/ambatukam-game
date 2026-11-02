@@ -199,6 +199,38 @@ class ProfileResponse(BaseModel):
     records: list[ProfileRecord]
     pvp: PvpTotals
     matches: list[ProfileMatch]
+    # How the logged-in viewer relates to this account (None for guests)
+    relation: Literal["self", "friends", "outgoing", "incoming", "none"] | None = None
+
+
+class Friend(BaseModel):
+    username: str
+    since: int
+
+
+class FriendRequest(BaseModel):
+    username: str
+    at: int
+
+
+class FriendsResponse(BaseModel):
+    friends: list[Friend]
+    incoming: list[FriendRequest]
+    outgoing: list[FriendRequest]
+
+
+class FriendActionResponse(BaseModel):
+    relation: Literal["friends", "outgoing", "none"]
+
+
+class LobbyRequest(BaseModel):
+    pid: PlayerId
+    name: PlayerName
+
+
+class LobbyTicketResponse(BaseModel):
+    ticket: str
+    name: str  # what others see: the username, or the cleaned guest name
 
 
 class ErrorResponse(BaseModel):

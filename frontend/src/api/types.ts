@@ -92,12 +92,33 @@ export interface ProfileMatch {
   opponent: { name: string; username: string | null; strokes: number; status: string } | null;
 }
 
+// Friends: GET /api/friends (who is online comes from the lobby socket, src/friends/FriendsHub.ts)
+export type Relation = "self" | "friends" | "outgoing" | "incoming" | "none";
+
+export interface Friend {
+  username: string;
+  since: number;
+}
+
+export interface FriendRequest {
+  username: string;
+  at: number;
+}
+
+export interface FriendsResponse {
+  friends: Friend[];
+  incoming: FriendRequest[];
+  outgoing: FriendRequest[];
+}
+
 export interface Profile {
   username: string;
   joined_at: number;
   records: ProfileRecord[];
   pvp: { played: number; wins: number; losses: number; draws: number };
   matches: ProfileMatch[];
+  /** How the logged-in viewer relates to this account (null for guests) */
+  relation: Relation | null;
 }
 
 /** Luật tên / mật khẩu, khớp backend/src/app/rules.py */

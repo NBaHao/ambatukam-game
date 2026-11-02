@@ -25,9 +25,18 @@
       "migrations_dir": "migrations"
     }
   ],
-  // One PvP room per challenge code (src/pvp_room.py). SQLite-backed: available on the free plan.
-  "durable_objects": { "bindings": [{ "name": "PVP_ROOM", "class_name": "PvpRoom" }] },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["PvpRoom"] }],
+  // One PvP room per challenge code (src/pvp_room.py) and one global lobby for presence and invites
+  // (src/lobby_room.py). SQLite-backed: available on the free plan. Never edit an applied tag.
+  "durable_objects": {
+    "bindings": [
+      { "name": "PVP_ROOM", "class_name": "PvpRoom" },
+      { "name": "LOBBY", "class_name": "Lobby" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["PvpRoom"] },
+    { "tag": "v2", "new_sqlite_classes": ["Lobby"] }
+  ],
   // Giới hạn số request theo IP (period chỉ được 10 hoặc 60 giây)
   "ratelimits": [
     { "name": "SESSION_LIMIT", "namespace_id": "1001", "simple": { "limit": 30, "period": 60 } },

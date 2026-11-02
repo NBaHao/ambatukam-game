@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { ApiError, api } from "../api/client";
-import type { Profile as ProfileData, ProfileMatch } from "../api/types";
+import type { Profile as ProfileData, ProfileMatch, Relation } from "../api/types";
+import { useFriends } from "../friends/context";
 import { useI18n, type Translate } from "../i18n/context";
 import type { TextKey } from "../i18n/strings";
 import { navigate, profilePath } from "../lib/route";
@@ -54,6 +55,57 @@ function MatchRow({ m, t, lang }: { m: ProfileMatch; t: Translate; lang: string 
   );
 }
 
+const FRIEND_BUTTON: Partial<Record<Relation, TextKey>> = {
+  none: "profAddFriend",
+  incoming: "profAcceptFriend",
+  outgoing: "profRequested",
+  friends: "profFriends",
+};
+
+/** Add / accept / cancel / unfriend, for a logged-in viewer */
+function FriendButton({ username, initial }: { username: string; initial: Relation }) {
+  const { t } = useI18n();
+  const [hub, view] = useFriends();
+  const [rel, setRel] = useState(initial);
+  const [hover, setHover] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const label = FRIEND_BUTTON[rel];
+  if (!label) return null;
+  const online = rel === "friends" && view.online.includes(username);
+  const act = async () => {
+    setBusy(true);
+    try {
+      if (rel === "none" || rel === "incoming") setRel(await hub.add(username));
+      else {
+        await hub.remove(username);
+        setRel("none");
+      }
+    } catch {
+      // stays as it was; the button can be pressed again
+    } finally {
+      setBusy(false);
+      setHover(false); // the undo label needs a fresh hover: a double click must not undo it
+    }
+  };
+  // Friends / sent: the button undoes it, and says so on hover or focus
+  const undo = rel === "friends" ? "profUnfriend" : rel === "outgoing" ? "frCancel" : null;
+  return (
+    <button
+      type="button"
+      className={rel === "none" || rel === "incoming" ? "btn primary sm prof-friend" : "btn sm prof-friend"}
+      disabled={busy}
+      onClick={() => void act()}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      onFocus={() => setHover(true)}
+      onBlur={() => setHover(false)}
+    >
+      {online && !hover && <i className="fr-dot on" />}
+      {t(hover && undo ? undo : label)}
+    </button>
+  );
+}
+
 /** /u/<username>: an account's best scores, PvP record and recent matches */
 export function Profile({ username, onBack }: { username: string; onBack: () => void }) {
   const { t, lang } = useI18n();
@@ -92,6 +144,7 @@ export function Profile({ username, onBack }: { username: string; onBack: () => 
       ) : (
         <>
           <p className="best">{t("accSince", new Date(p.joined_at).toLocaleDateString(lang))}</p>
+          {p.relation && <FriendButton key={p.username} username={p.username} initial={p.relation} />}
 
           <section className="prof-sec">
             <h3>{t("profBest")}</h3>

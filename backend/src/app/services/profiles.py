@@ -7,17 +7,25 @@ exposed: no player ids, email or sign-in data, only what the leaderboard and PvP
 from typing import Any
 
 from app import rules
-from app.db import ProfileRepository, UserRepository
+from app.db import FriendRepository, ProfileRepository, UserRepository
 from app.errors import ApiError
+from app.services import friends as friendship
 
 _MODE_ORDER = {"single": 0, "double": 1, "random": 2}
 
 
-async def profile(users: UserRepository, profiles: ProfileRepository, username: str) -> dict[str, Any]:
+async def profile(
+    users: UserRepository,
+    profiles: ProfileRepository,
+    username: str,
+    friends: FriendRepository | None = None,
+    viewer: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     user = await users.by_username(username)
     if user is None:
         raise ApiError("user_not_found", 404)
     stats = await profiles.stats(user["pid"], rules.PVP_HISTORY_N)
+    relation = await friendship.relation(friends, viewer, user) if friends and viewer else None
     records = sorted(stats["records"], key=lambda r: (_MODE_ORDER.get(r["mode"], 9), r["duration"]))
     return {
         "username": user["username"],
@@ -25,6 +33,7 @@ async def profile(users: UserRepository, profiles: ProfileRepository, username: 
         "records": records,
         "pvp": stats["pvp"],
         "matches": [_match(m) for m in stats["matches"]],
+        "relation": relation,
     }
 
 

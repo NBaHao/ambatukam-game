@@ -51,3 +51,12 @@
 .pvp-pnum { font-family: var(--mono); font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .pvp-pstatus { grid-column: 1 / -1; color: var(--accent); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
 .pvp-result .res-meta:empty { display: none; }
+
+/* Matchmaking */
+.pvp-searching { font-size: 18px; font-variant-numeric: tabular-nums; margin: 4px 0; }
+.pvp-searching::before {
+  content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 10px; border-radius: 50%;
+  background: var(--accent); animation: pvp-pulse 1s ease-in-out infinite alternate;
+}
+@keyframes pvp-pulse { from { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .pvp-searching::before { animation: none; } }
