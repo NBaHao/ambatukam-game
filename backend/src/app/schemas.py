@@ -159,5 +159,47 @@ class MeResponse(BaseModel):
     user: User | None
 
 
+class ProfileRecord(BaseModel):
+    mode: str
+    duration: int
+    score: float
+    strokes: int
+    rank: int
+    total: int
+
+
+class PvpTotals(BaseModel):
+    played: int
+    wins: int
+    losses: int
+    draws: int
+
+
+class ProfileOpponent(BaseModel):
+    name: str
+    username: str | None  # set when they played logged in: link to their profile
+    strokes: int
+    status: str
+
+
+class ProfileMatch(BaseModel):
+    id: str
+    mode: str
+    duration: int
+    ended_at: int
+    result: str  # win | loss | draw
+    status: str  # ok | rejected | forfeit
+    strokes: int
+    opponent: ProfileOpponent | None
+
+
+class ProfileResponse(BaseModel):
+    username: str
+    joined_at: int
+    records: list[ProfileRecord]
+    pvp: PvpTotals
+    matches: list[ProfileMatch]
+
+
 class ErrorResponse(BaseModel):
     error: str

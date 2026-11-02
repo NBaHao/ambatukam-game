@@ -6,6 +6,7 @@ import { useI18n } from "../i18n/context";
 import { formatBoardScore } from "../lib/scoring";
 import { modeName } from "../lib/share";
 import { playerId } from "../lib/storage";
+import { ProfileLink } from "./Profile";
 import { SegmentedControl } from "./SegmentedControl";
 import "./Leaderboard.css";
 
@@ -64,7 +65,7 @@ export function Leaderboard({ initialMode, initialDuration, onBack }: Props) {
             <li key={`${i}-${e.name}`} className={e.me ? "me" : undefined}>
               <span className="rk">{i + 1}</span>
               <span className="nm">
-                {e.name}
+                {e.registered ? <ProfileLink username={e.name}>{e.name}</ProfileLink> : e.name}
                 {e.registered && (
                   <i className="reg" title={t("boardRegistered")} aria-label={t("boardRegistered")}>
                     ✓

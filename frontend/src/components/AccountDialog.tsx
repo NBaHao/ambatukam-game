@@ -4,6 +4,7 @@ import { ApiError } from "../api/client";
 import { PASSWORD_MAX, PASSWORD_MIN, RESERVED_PREFIX, USERNAME_RE } from "../api/types";
 import { useI18n, type Translate } from "../i18n/context";
 import { Rich } from "../i18n/Rich";
+import { navigate, profilePath } from "../lib/route";
 import { CaptchaError } from "../lib/turnstile";
 import "./AccountDialog.css";
 
@@ -242,6 +243,16 @@ export function AccountDialog({ open, onClose }: Props) {
           <p className="acc-hint">
             {t("accSince", new Date(account.user.created_at).toLocaleDateString(lang))}
           </p>
+          <button
+            type="button"
+            className="btn primary"
+            onClick={() => {
+              close();
+              navigate(profilePath(account.user!.username));
+            }}
+          >
+            {t("profMine")}
+          </button>
           <button type="button" className="btn" data-autofocus disabled={busy} onClick={() => void run(async () => {
             await account.logout();
             go("name");

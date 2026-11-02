@@ -279,3 +279,72 @@ class MatchRepository:
                 ),
             ]
         )
+
+
+# ---------- Profiles ----------
+
+# Every best score of a player, with its current rank on that board
+_PROFILE_RECORDS = """
+SELECT s.mode, s.duration, s.score, s.strokes,
+  (SELECT COUNT(*) FROM scores o WHERE o.mode = s.mode AND o.duration = s.duration
+     AND (o.score > s.score OR (o.score = s.score AND o.updated_at < s.updated_at))) + 1 AS rank,
+  (SELECT COUNT(*) FROM scores o WHERE o.mode = s.mode AND o.duration = s.duration) AS total
+FROM scores s WHERE s.pid = ?1
+"""
+
+_PROFILE_PVP = """
+SELECT COUNT(*) AS played,
+  COALESCE(SUM(result = 'win'), 0) AS wins,
+  COALESCE(SUM(result = 'loss'), 0) AS losses,
+  COALESCE(SUM(result = 'draw'), 0) AS draws
+FROM match_players WHERE pid = ?1
+"""
+
+# Latest rounds with the opponent; the opponent's username only if they played as that account
+_PROFILE_MATCHES = """
+SELECT m.id, m.mode, m.duration, me.ended_at, me.result, me.status, me.strokes,
+  op.name AS opp_name, op.strokes AS opp_strokes, op.status AS opp_status, u.username AS opp_username
+FROM match_players me
+JOIN matches m ON m.id = me.match_id
+LEFT JOIN match_players op ON op.match_id = me.match_id AND op.pid != me.pid
+LEFT JOIN users u ON u.pid = op.pid AND op.registered = 1
+WHERE me.pid = ?1
+ORDER BY me.ended_at DESC
+LIMIT ?2
+"""
+
+_RECORD_KEYS = ("mode", "duration", "score", "strokes", "rank", "total")
+_MATCH_KEYS = (
+    "id",
+    "mode",
+    "duration",
+    "ended_at",
+    "result",
+    "status",
+    "strokes",
+    "opp_name",
+    "opp_strokes",
+    "opp_status",
+    "opp_username",
+)
+
+
+class ProfileRepository:
+    def __init__(self, db: D1Database) -> None:
+        self._db = db
+
+    async def stats(self, pid: str, history: int) -> dict[str, Any]:
+        """Records, PvP totals and the latest `history` PvP rounds of one player id."""
+        records, pvp, matches = await self._db.batch(
+            [
+                self._db.prepare(_PROFILE_RECORDS).bind(pid),
+                self._db.prepare(_PROFILE_PVP).bind(pid),
+                self._db.prepare(_PROFILE_MATCHES).bind(pid, history),
+            ]
+        )
+        totals = _rows(pvp)[0]
+        return {
+            "records": [{k: r[k] for k in _RECORD_KEYS} for r in _rows(records)],
+            "pvp": {k: int(totals[k] or 0) for k in ("played", "wins", "losses", "draws")},
+            "matches": [{k: r[k] for k in _MATCH_KEYS} for r in _rows(matches)],
+        }

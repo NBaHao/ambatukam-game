@@ -46,6 +46,7 @@
 }
 .pvp-players li.win { border-color: var(--accent); }
 .pvp-pname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pvp-pname a { color: inherit; text-underline-offset: 3px; }
 .pvp-players li.me .pvp-pname { font-weight: 700; }
 .pvp-pnum { font-family: var(--mono); font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .pvp-pstatus { grid-column: 1 / -1; color: var(--accent); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }

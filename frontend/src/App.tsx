@@ -8,6 +8,7 @@ import { Header } from "./components/Header";
 import { Hud } from "./components/Hud";
 import { Leaderboard } from "./components/Leaderboard";
 import { PowerBar } from "./components/PowerBar";
+import { Profile } from "./components/Profile";
 import { ReadyScreen } from "./components/ReadyScreen";
 import { ResultDialog, type FinishedRun } from "./components/ResultDialog";
 import { StartScreen } from "./components/StartScreen";
@@ -60,11 +61,12 @@ export function App() {
   }, []);
   // Lần đầu vào game (khách): hỏi username như TETR.IO, để trống là chơi khách
   const [welcomeDone, setWelcomeDone] = useState(false);
-  const showAccount = accountOpen || (account.welcome && !welcomeDone && !DEBUG);
   const sessionRef = useRef<Promise<string | null>>(Promise.resolve(null));
 
   // PvP: /c/<code> opens a room; the start screen's PvP button opens the host lobby
   const route = useRoute();
+  // Only on the home page: someone opening a challenge or profile link came for that, not to sign up
+  const showAccount = accountOpen || (account.welcome && !welcomeDone && !DEBUG && route.name === "home");
   const pvp = usePvp(engine);
   const pvpRef = useRef(pvp.session);
   useEffect(() => {
@@ -109,8 +111,8 @@ export function App() {
 
   // Đang xem bảng xếp hạng / gõ tên / mở hộp tài khoản thì không bắt cử chỉ xòe tay
   useEffect(() => {
-    engine.setGesturesEnabled(view === "game" && !typing && !showAccount && !lobby);
-  }, [engine, view, typing, showAccount, lobby]);
+    engine.setGesturesEnabled(view === "game" && route.name !== "profile" && !typing && !showAccount && !lobby);
+  }, [engine, view, route.name, typing, showAccount, lobby]);
 
   useEffect(() => {
     if (!DEBUG) return;
@@ -144,7 +146,9 @@ export function App() {
           <video ref={videoRef} className="cam-video" playsInline muted />
           <canvas ref={canvasRef} className="cam-overlay" />
 
-          {view === "board" ? (
+          {route.name === "profile" ? (
+            <Profile key={route.username} username={route.username} onBack={() => navigate("/")} />
+          ) : view === "board" ? (
             <Leaderboard
               initialMode={finished && phase === "result" ? finished.run.mode : mode}
               initialDuration={finished && phase === "result" ? finished.run.duration : duration}

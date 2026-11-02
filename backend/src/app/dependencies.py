@@ -8,7 +8,7 @@ from fastapi import Cookie, Depends, Request
 
 from app import clock
 from app.config import Settings
-from app.db import ScoreRepository, UserRepository
+from app.db import ProfileRepository, ScoreRepository, UserRepository
 from app.errors import ApiError
 from app.services import accounts, passwords, turnstile
 
@@ -32,6 +32,10 @@ def get_repository(env: Env) -> ScoreRepository:
 
 def get_users(env: Env) -> UserRepository:
     return UserRepository(env.DB)
+
+
+def get_profiles(env: Env) -> ProfileRepository:
+    return ProfileRepository(env.DB)
 
 
 def get_kdf() -> passwords.Kdf:
@@ -69,5 +73,6 @@ SettingsDep = Annotated[Settings, Depends(get_settings)]
 RepositoryDep = Annotated[ScoreRepository, Depends(get_repository)]
 HumanVerifierDep = Annotated[HumanVerifier, Depends(get_human_verifier)]
 UsersDep = Annotated[UserRepository, Depends(get_users)]
+ProfilesDep = Annotated[ProfileRepository, Depends(get_profiles)]
 KdfDep = Annotated[passwords.Kdf, Depends(get_kdf)]
 SessionDep = Annotated[accounts.Session | None, Depends(get_session)]
