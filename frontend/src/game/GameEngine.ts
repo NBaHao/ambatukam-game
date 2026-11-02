@@ -15,6 +15,7 @@ import {
   ANCHOR_HOLD_MS,
   ANCHOR_ZONE_X,
   ANCHOR_ZONE_Y,
+  COUNTDOWN_PLAY_DELAY_MS,
   COUNTDOWN_STEP_MS,
   COUNTDOWN_STEPS,
   DOUBLE_ZONE_X,
@@ -41,7 +42,8 @@ import { drawOverlay } from "./render";
 import { Store } from "./Store";
 import { isTimed, type HandPose, type Landmarks, type RunConfig, type RunResult } from "./types";
 
-export type Phase = "idle" | "ready" | "anchor" | "countdown" | "playing" | "result";
+/** waiting: PvP only, hands are set and the server hasn't started the match yet */
+export type Phase = "idle" | "ready" | "anchor" | "waiting" | "countdown" | "playing" | "result";
 
 /** Hướng dẫn cử chỉ (khoá chuỗi i18n) */
 export type GestureKey =
@@ -53,7 +55,8 @@ export type GestureKey =
   | "gApart"
   | "gHold"
   | "gCountdown"
-  | "gCountdownRandom";
+  | "gCountdownRandom"
+  | "gWaitOpponent";
 
 /** Cảnh báo khi đang chơi (khoá chuỗi i18n) */
 export type StatusKey = "sLost" | "sOneHand" | "sGrip" | "sAnchor" | "sGoRod";
@@ -92,6 +95,8 @@ export interface HudState {
 
 export interface EngineHandlers {
   onPlayStart?: (config: RunConfig) => void;
+  /** PvP (start gate on): hands are set, the engine waits for startCountdownAt() */
+  onSet?: () => void;
   onFinish?: (run: RunResult) => void;
 }
 
@@ -111,6 +116,8 @@ interface RunState {
 }
 
 const round1 = (v: number) => Math.round(v * 10) / 10;
+/** From the first countdown step to play: "3", "2", "1", "GO", then a short beat */
+export const COUNTDOWN_LEAD_MS = (COUNTDOWN_STEPS.length - 1) * COUNTDOWN_STEP_MS + COUNTDOWN_PLAY_DELAY_MS;
 
 export class GameEngine {
   readonly ui = new Store<UiState>({
@@ -174,6 +181,7 @@ export class GameEngine {
   private displayRate = 0;
   private refSize = 0.12; // cỡ tay đo lúc xòe tay, dùng để vẽ trụ ngẫu nhiên
   private gesturesEnabled = true;
+  private startGate = false;
   private raf = 0;
   private timers: number[] = [];
   private readonly palmHold = new Hold(PALM_HOLD_MS);
@@ -225,6 +233,14 @@ export class GameEngine {
     this.setPhase("ready");
   }
 
+  /**
+   * PvP: once the hands are set, wait (phase "waiting", onSet) instead of counting down,
+   * until startCountdownAt() is called with the shared start time. Also turns off palm-to-replay.
+   */
+  setStartGate(on: boolean): void {
+    this.startGate = on;
+  }
+
   /** Bỏ qua cử chỉ (đang gõ tên, đang xem bảng xếp hạng…) */
   setGesturesEnabled(enabled: boolean): void {
     this.gesturesEnabled = enabled;
@@ -258,7 +274,7 @@ export class GameEngine {
     beep(660, 80, 0.08, "sine");
     if (this.config.mode === "random") {
       this.spawnRod();
-      this.startCountdown();
+      this.handsSet();
     } else this.setPhase("anchor");
   }
 
@@ -436,7 +452,7 @@ export class GameEngine {
     const hands = tracks.map((tr) => tr.hand);
 
     let progress = 0;
-    if (phase === "ready" || phase === "result") {
+    if (phase === "ready" || (phase === "result" && !this.startGate)) {
       const openHand = hands.find((h) => h?.open);
       progress = this.palmHold.update(Boolean(openHand) && this.gesturesEnabled, now);
       if (openHand) this.refSize = openHand.size;
@@ -450,14 +466,16 @@ export class GameEngine {
       progress = this.updateAnchorPhase(hands, seen, aspect, now);
       if (progress >= 1) {
         tracks.forEach((tr) => tr.commitAnchor(tr.hand!));
-        this.startCountdown();
+        this.handsSet();
       }
     } else if (phase === "countdown") {
       this.setGesture(this.config.mode === "random" ? "gCountdownRandom" : "gCountdown");
+    } else if (phase === "waiting") {
+      this.setGesture("gWaitOpponent");
     }
 
     // Kiểm tra bám trụ khi đang đếm ngược / chơi. Khung không thấy tay thì giữ nguyên kết quả khung trước.
-    const active = phase === "countdown" || phase === "playing";
+    const active = phase === "waiting" || phase === "countdown" || phase === "playing";
     tracks.forEach((tr, i) => {
       if (!tr.hand) {
         tr.onRod = false;
@@ -540,17 +558,32 @@ export class GameEngine {
   }
 
   // ---------- Vòng chơi ----------
-  private startCountdown(): void {
+  /** Hands are set (anchor held, or a random rod spawned): count down now, or wait for PvP start */
+  private handsSet(): void {
+    if (!this.startGate) {
+      this.startCountdownAt(performance.now() + COUNTDOWN_LEAD_MS);
+      return;
+    }
+    this.setPhase("waiting");
+    this.handlers.onSet?.();
+  }
+
+  /**
+   * Count down so that play starts at `goAt` (performance.now() time). PvP passes the server's
+   * start time so both players start together; if it is already late, the steps catch up at once.
+   */
+  startCountdownAt(goAt: number): void {
+    this.clearTimers();
     this.setPhase("countdown");
     countdownStart();
+    const t0 = goAt - COUNTDOWN_LEAD_MS - performance.now();
     COUNTDOWN_STEPS.forEach((step, i) => {
       this.later(() => {
         this.ui.update({ countdown: step });
-        const last = i === COUNTDOWN_STEPS.length - 1;
-        countdownHit(last, i);
-        if (last) this.later(() => this.startPlaying(), 400);
-      }, i * COUNTDOWN_STEP_MS);
+        countdownHit(i === COUNTDOWN_STEPS.length - 1, i);
+      }, Math.max(0, t0 + i * COUNTDOWN_STEP_MS));
     });
+    this.later(() => this.startPlaying(), Math.max(0, goAt - performance.now()));
   }
 
   startPlaying(): void {

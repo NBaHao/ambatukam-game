@@ -45,7 +45,8 @@ Toàn bộ nằm trong free tier của Cloudflare (Workers 100k request/ngày, D
 | **Single** | 1 tay, 1 trụ. Đặt neo rồi xóc trong 10 / 20 / 30 giây | Lọ/giây trung bình |
 | **Double** | 2 tay, 2 trụ. Cả hai tay cùng nắm và giữ yên để đặt hai neo, rồi xóc cả hai. Lọ hai tay cộng dồn | Lọ/giây trung bình (danh hiệu tính theo mỗi tay) |
 | **Random** | Trụ hiện ở chỗ ngẫu nhiên, nghiêng ngẫu nhiên, và đổi chỗ sau 5 giây (giảm dần tới 2.5 giây). Phải nắm tay đuổi theo rồi xóc. Thanh **Lửa** cạn 10%/giây lúc đầu và cạn nhanh dần; mỗi lọ đúng trụ nạp 5%. Hết Lửa là dừng | Số giây sống sót |
-| Rank, PvP | Sắp có | |
+| **PvP** | 1v1 qua link thách đấu, Single hoặc Double. Xem [PvP](#pvp) | Ai nhiều lọ hơn thắng |
+| Rank | Sắp có | |
 
 Kỷ lục lưu riêng cho từng chế độ (và từng mốc thời gian) trong `localStorage`.
 
@@ -80,6 +81,9 @@ API (`backend/src/app/routers/`, tài liệu OpenAPI ở `/api/docs`):
 | `POST /api/auth/login` `{ username, password }` | Log in, sets the session cookie |
 | `POST /api/auth/logout` | Log out |
 | `GET /api/me` | The logged-in account (or `null`), renews the session |
+| `POST /api/rooms` `{ mode, duration, pid, name }` | Create a PvP room: `{ code, ticket }` |
+| `POST /api/rooms/{code}/join` `{ pid, name }` | Ticket to join a room |
+| `GET /api/rooms/{code}/ws?ticket=` | WebSocket to the room (Durable Object) |
 
 ## Accounts
 
@@ -103,6 +107,33 @@ They last 30 days and `/api/me` renews them. Each login drops the account's expi
 only the newest `MAX_SESSIONS` (10).
 Rate limits: register and login share a per-IP limit (`AUTH_LIMIT`); login also has a per-username
 limit across all IPs (`LOGIN_NAME_LIMIT`, 10 per minute) against spread-out password guessing.
+
+## PvP
+
+1v1 through a challenge link, both players on one clock:
+
+1. PvP on the start screen → pick Single or Double and 10 / 20 / 30 s → **Create challenge link**.
+   The page moves to `/c/<code>`; send that link to your opponent.
+2. The opponent opens the link → **Join & start camera**. Both set their hands as usual (open hand,
+   then grip and hold still), then wait for each other.
+3. Once both are ready the server picks GO = now + 4.5 s and both clients count down to it
+   (clock offset measured with ping/pong, lowest round-trip wins). Each side sees the other's live count.
+4. When time is up each client sends its run; the server decides win / loss / draw, then **Rematch**
+   or **Leave**. The room keeps the match score until someone else takes an empty seat.
+
+How it works: each room is a Durable Object (`PvpRoom`, `backend/src/pvp_room.py`) holding the
+WebSockets (hibernation API) and the state; the rules are plain Python in
+`backend/src/app/services/room.py` (unit-tested without the DO). Joining needs a signed ticket from
+`POST /api/rooms…` (HMAC with `TOKEN_SECRET`, 6 hours, bound to one room), which also carries the
+player's name and whether it is an account. Logged-in players play under their username; guests
+follow the same name rules as the leaderboard.
+
+Anti-cheat for PvP is server-side and timed by the server: live counts must stay under the human limit
+for the time elapsed and never go down, the final run must not arrive before GO + duration − 1.5 s, must
+pass the same checks as a leaderboard run and can't be far above the last live count. A run that fails
+counts as a loss (shown as "didn't count"); a player who sends nothing by GO + duration + 15 s forfeits.
+Each round is stored in D1 (`matches`, `match_players`) for profiles and history.
+PvP runs don't go to the leaderboard. No video or audio is exchanged.
 
 ## Cách chơi
 
@@ -190,7 +221,7 @@ Nhảy thẳng tới một màn hình để xem giao diện, thêm `mode=single|
 ## Ý tưởng tiếp theo
 
 - Rank: chống gian lận chặt hơn bằng chuỗi thời điểm từng lọ
-- PvP: 1v1 qua WebRTC
+- PvP: matchmaking với người lạ, video/voice qua WebRTC
 - Rhythm: xóc theo nhịp nhạc
 
 ## License
@@ -201,7 +232,7 @@ MIT
 
 ## English
 
-Webcam meme game: grip like you're holding a rod, stroke up and down as fast as you can. Three modes: **Single** (1 hand, timed, average strokes/sec), **Double** (2 hands, 2 rods, strokes add up), **Random** (the rod spawns at random spots and keeps relocating; chase it to keep your Heat meter up, survive as long as you can). Rank and PvP are coming soon.
+Webcam meme game: grip like you're holding a rod, stroke up and down as fast as you can. Three modes: **Single** (1 hand, timed, average strokes/sec), **Double** (2 hands, 2 rods, strokes add up), **Random** (the rod spawns at random spots and keeps relocating; chase it to keep your Heat meter up, survive as long as you can). **PvP**: send a challenge link and race a friend on the same clock. Rank is coming soon.
 
 Hand tracking runs entirely in the browser; video never leaves the device. The only backend is the leaderboard (Cloudflare Workers + D1), which receives just a name and a score. For fun, 16+, no explicit imagery.
 

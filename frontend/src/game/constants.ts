@@ -20,6 +20,7 @@ export const HAND_MIN_GAP = 2.2; // double: hai điểm neo cách nhau ít nhấ
 export const TIER_MIN = [0, 1, 2, 3, 4, 5]; // ngưỡng nhát/giây (mỗi tay) của từng danh hiệu
 export const COUNTDOWN_STEPS = ["3", "2", "1", "GO"];
 export const COUNTDOWN_STEP_MS = 800;
+export const COUNTDOWN_PLAY_DELAY_MS = 400; // "GO" → counting starts
 
 // ---------- Random ----------
 // RND_METER_START / RND_DRAIN_* / RND_STROKE_GAIN phải khớp backend/src/app/rules.py (server dựng lại thanh Lửa)

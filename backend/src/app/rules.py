@@ -38,6 +38,20 @@ SESSION_DAYS = 30
 SESSION_RENEW_DAYS = 15  # /api/me pushes the expiry forward once fewer days than this remain
 MAX_SESSIONS = 10  # per account; logging in on an 11th device ends the oldest session
 
+# PvP rooms (challenge links). Only the timed modes: both players race the same clock.
+PVP_MODES = ("single", "double")
+ROOM_CODE_ALPHABET = "23456789abcdefghjkmnpqrstuvwxyz"  # no 0/o, 1/i/l
+ROOM_CODE_LEN = 6
+ROOM_CODE_PATTERN = f"^[{ROOM_CODE_ALPHABET}]{{{ROOM_CODE_LEN}}}$"
+ROOM_SEATS = 2
+ROOM_TICKET_SEC = 6 * 3600  # a ticket lets its holder (re)connect to one room for this long
+ROOM_IDLE_MS = 2 * 3600 * 1000  # empty rooms are deleted after this
+PVP_START_DELAY_MS = 4_500  # "both ready" → GO; the client countdown takes 2.8 s, the rest covers latency
+PVP_FINAL_GRACE_MS = 15_000  # after time's up, how long to wait for results before forfeiting
+PVP_EARLY_SLACK_MS = 1_500  # a final result may arrive this much before time's up (clock skew)
+PVP_PROGRESS_GAP_SEC = 3  # final strokes may exceed the last live progress by this many seconds' worth
+PVP_HISTORY_N = 20
+
 # Random: Lửa bắt đầu 100% (tối đa 100%), cạn (10 + 0.4·t)%/giây, mỗi nhát nạp 5%
 RND_START = 100
 RND_DRAIN = 10

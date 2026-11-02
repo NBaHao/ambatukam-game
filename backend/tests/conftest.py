@@ -77,6 +77,7 @@ def env() -> SimpleNamespace:
         SCORE_LIMIT=FakeRateLimiter(1000),
         AUTH_LIMIT=FakeRateLimiter(1000),
         LOGIN_NAME_LIMIT=FakeRateLimiter(1000),
+        ROOM_LIMIT=FakeRateLimiter(1000),
         TOKEN_SECRET="test-secret",
         TURNSTILE_SECRET="test-turnstile",
     )

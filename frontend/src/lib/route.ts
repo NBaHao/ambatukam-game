@@ -1,0 +1,37 @@
+// Tiny path router: the Worker serves index.html for unknown paths (single-page-application),
+// so links like /c/<code> load the app and React picks the screen from the path.
+import { useSyncExternalStore } from "react";
+
+export type Route = { name: "home" } | { name: "room"; code: string } | { name: "profile"; username: string };
+
+const ROOM = /^\/c\/([a-z0-9]{6})\/?$/;
+const PROFILE = /^\/u\/([A-Za-z0-9_-]{3,16})\/?$/;
+
+export function parseRoute(path: string): Route {
+  const room = ROOM.exec(path);
+  if (room) return { name: "room", code: room[1] };
+  const profile = PROFILE.exec(path);
+  if (profile) return { name: "profile", username: profile[1].toLowerCase() };
+  return { name: "home" };
+}
+
+export const roomPath = (code: string) => `/c/${code}`;
+export const profilePath = (username: string) => `/u/${username}`;
+
+const subscribe = (cb: () => void) => {
+  addEventListener("popstate", cb);
+  return () => removeEventListener("popstate", cb);
+};
+const getPath = () => location.pathname;
+
+export function navigate(path: string, { replace = false } = {}): void {
+  if (path === location.pathname) return;
+  if (replace) history.replaceState(null, "", path);
+  else history.pushState(null, "", path);
+  dispatchEvent(new PopStateEvent("popstate"));
+}
+
+export function useRoute(): Route {
+  const path = useSyncExternalStore(subscribe, getPath);
+  return parseRoute(path);
+}

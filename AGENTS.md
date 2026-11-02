@@ -18,19 +18,21 @@ frontend/                React 19 + TypeScript + Vite
   src/game/              Engine thuần TS (không React, không i18n): nhận diện tay, đếm nhát, vẽ canvas
   src/components/        Component React, mỗi component một file .css riêng nếu cần
   src/account/           AccountProvider + useAccount: tài khoản kiểu TETR.IO (/api/me, login, register, logout)
+  src/pvp/               PvP: RoomClient (WebSocket + clock sync), PvpSession (room ↔ engine), lobby/bar/result UI
   src/hooks/             useGameEngine, useStore (đọc Store của engine), useScoreSubmission
   src/api/               Client gọi /api, kiểu dữ liệu khớp backend/src/app/schemas.py
   src/i18n/              Chuỗi en (gốc) / vi, provider, <Rich> (**đậm**)
-  src/lib/               storage (localStorage), scoring, share (ảnh kết quả), turnstile
+  src/lib/               storage (localStorage), scoring, share (ảnh kết quả), turnstile, route (/c/<code>, /u/<name>)
   src/assets/audio/      Mẫu âm thanh đã cắt sẵn (giọng meme, đếm ngược, nhạc Top 10)
   src/styles/global.css  Token màu, nút, layout chung
   public/                favicon, icon, og.png, site.webmanifest (copy nguyên vào dist)
   brand/, scripts/       Nguồn og.svg, dựng icon (`npm run brand`), cắt âm thanh (`npm run sound`, `npm run sound:countdown`)
 backend/                 FastAPI trên Cloudflare Python Workers (quản lý bằng uv + pywrangler)
-  src/entry.py           WorkerEntrypoint → ASGI
+  src/entry.py           WorkerEntrypoint → ASGI; /api/rooms/{code}/ws → Durable Object PvpRoom
+  src/pvp_room.py        PvpRoom (Durable Object): WebSockets + room state, rules in services/room.py
   src/app/main.py        create_app(): router, error handler, /api/docs
-  src/app/routers/       sessions, scores, leaderboard, auth
-  src/app/services/      tokens (HMAC), anticheat, turnstile, names, accounts, passwords (PBKDF2)
+  src/app/routers/       sessions, scores, leaderboard, auth, rooms
+  src/app/services/      tokens (HMAC), anticheat, turnstile, names, accounts, passwords (PBKDF2), tickets, room
   src/app/db.py          ScoreRepository, UserRepository trên D1
   src/app/rules.py       Hằng số luật chơi / chống gian lận
   migrations/            D1 migrations (đánh số 000N_*.sql)
@@ -100,6 +102,12 @@ Chrome headless không có WebGL thì MediaPipe lỗi (`activeTexture`); chạy 
 - `RND_METER_START / RND_DRAIN_BASE / RND_DRAIN_RAMP / RND_STROKE_GAIN` ở `frontend/src/game/constants.ts` ↔ `RND_START / RND_DRAIN / RND_RAMP / RND_GAIN` ở `backend/src/app/rules.py` (server dựng lại thanh Lửa để kiểm tra).
 - Kiểu trong `frontend/src/api/types.ts` ↔ `backend/src/app/schemas.py`; mã lỗi `REJECTED_CODES` ↔ các `ApiError(...)` trong `routers/scores.py`.
 - Account rules: `USERNAME_RE`, `RESERVED_PREFIX`, `PASSWORD_MIN/MAX` in `frontend/src/api/types.ts` ↔ `rules.py`; error codes in `AccountDialog.tsx` / `useScoreSubmission.ts` ↔ `ApiError(...)` in `services/accounts.py` and `routers/auth.py`.
+- PvP socket messages: `frontend/src/pvp/protocol.ts` ↔ `backend/src/app/services/room.py` / `src/pvp_room.py`
+  (state, progress, result, pong, error; close codes 4000/4001). Room code format: `ROOM_CODE_*` in `rules.py`
+  ↔ the `/c/` pattern in `frontend/src/lib/route.ts`. `PVP_START_DELAY_MS` must stay longer than the client
+  countdown (`COUNTDOWN_LEAD_MS` in `GameEngine.ts`).
+- Durable Object `PvpRoom`: renaming or removing the class needs a new entry in `migrations` of `wrangler.jsonc`
+  (never edit an applied tag).
 - Tên khoá localStorage trong `frontend/src/lib/storage.ts`: đổi là người chơi mất kỷ lục và mã người chơi.
 - Phiên bản `@mediapipe/tasks-vision` trong `package.json` (ghim cứng) ↔ `MEDIAPIPE_VERSION` ở `src/game/landmarker.ts` (WASM tải từ CDN theo phiên bản này).
 - Mốc cắt mẫu âm thanh trong `frontend/scripts/sound.sh` / `countdown-sfx.sh` ↔ `HYPE_HIT_AT` và nhịp đếm ngược trong `src/game/audio.ts` (đổi file thì nghe lại và đo lại mốc).
