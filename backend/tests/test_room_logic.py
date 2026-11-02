@@ -285,3 +285,34 @@ def test_pong_echoes_client_time():
     assert pong(123.5, T0) == {"t": "pong", "c": 123.5, "s": T0}
     assert pong("x", T0) is None
     assert pong(float("nan"), T0) is None
+
+
+def signal(m: "Match", pid: str, cid: str, data: Any) -> list[Any]:
+    return RoomLogic(m.state).signal(pid, cid, data)
+
+
+def test_media_opt_in_is_shared_and_reset_on_reconnect():
+    m = Match()
+    outs = m.run("set_media", A, "ca", True, False)
+    assert [p["cam"] for p in msgs(outs, B, "state")[0]["players"]] == [True, False]
+    assert m.run("set_media", A, "ca", True, False) == []  # no change, nothing sent
+    assert m.run("set_media", A, "ca", "yes", False) == []
+    assert m.run("set_media", A, "stale", False, False) == []
+    m.run("join", ticket(A, "alice"), "ca2")
+    assert m.state["players"][0]["cam"] is False  # type: ignore[index]
+
+
+def test_signals_only_flow_when_both_agree():
+    m = Match()
+    offer = {"sdp": "v=0...", "type": "offer", "sid": 1}
+    assert signal(m, A, "ca", offer) == []  # nobody opted in
+    m.run("set_media", A, "ca", True, False)
+    m.run("set_media", B, "cb", False, True)
+    assert signal(m, A, "ca", offer) == []  # different kinds: no agreement
+    m.run("set_media", B, "cb", True, True)
+    outs = signal(m, A, "ca", offer)
+    assert [(o.to, o.msg) for o in outs] == [(B, {"t": "signal", "d": offer})]
+    assert signal(m, A, "ca", "not a dict") == []
+    assert signal(m, A, "old-tab", offer) == []
+    m.run("leave", B, "cb")
+    assert signal(m, A, "ca", offer) == []

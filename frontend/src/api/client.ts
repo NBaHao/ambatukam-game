@@ -67,6 +67,10 @@ export const api = {
   joinRoom: (code: string, body: { pid: string; name: string }) =>
     post<RoomTicket>(`/api/rooms/${encodeURIComponent(code)}/join`, body),
 
+  // Video / voice with the PvP opponent: 503 rtc_unavailable when the server has no TURN service
+  roomIce: (code: string, ticket: string) =>
+    post<{ ice_servers: RTCIceServer[]; relay: boolean }>(`/api/rooms/${encodeURIComponent(code)}/ice`, { ticket }),
+
   // Friends (logged in only) and the lobby socket ticket (src/friends/FriendsHub.ts)
   friends: () => request<FriendsResponse>("/api/friends"),
   addFriend: (username: string) =>

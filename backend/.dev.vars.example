@@ -8,3 +8,10 @@ TOKEN_SECRET=dev-only-change-me
 # Khoá bí mật Turnstile. Đây là khoá thử của Cloudflare, luôn xác minh thành công:
 # https://developers.cloudflare.com/turnstile/troubleshooting/testing/
 TURNSTILE_SECRET=1x0000000000000000000000000000000AA
+
+# PvP video / voice (optional). Production: Cloudflare dashboard → Realtime → TURN → create a key, then
+#   uv run pywrangler secret put TURN_KEY_ID
+#   uv run pywrangler secret put TURN_KEY_API_TOKEN
+# Without them the camera / mic toggles stay hidden. Locally, RTC_ALLOW_DIRECT=1 tries WebRTC without
+# TURN (direct connections show each player's IP to the other: never set it in production).
+RTC_ALLOW_DIRECT=1

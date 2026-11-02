@@ -13,7 +13,11 @@ const PROGRESS_EVERY_MS = 250;
 /** Local Date.now() time → performance.now() time (what the engine schedules with) */
 const toPerf = (localMs: number) => performance.now() + (localMs - Date.now());
 
+let sessions = 0;
+
 export class PvpSession {
+  /** Unique per session: React keys for things that live as long as the session */
+  readonly id = ++sessions;
   private unsubs: (() => void)[] = [];
   private progressTimer = 0;
   private startedRound = 0;

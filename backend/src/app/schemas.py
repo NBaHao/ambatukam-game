@@ -1,6 +1,6 @@
 """Request / response của API. Lỗi kiểu dữ liệu → 422 {"error": "invalid_request"}."""
 
-from typing import Annotated, Literal, Self
+from typing import Annotated, Any, Literal, Self
 
 from pydantic import (
     AfterValidator,
@@ -109,6 +109,17 @@ class JoinRoomRequest(BaseModel):
 class RoomTicketResponse(BaseModel):
     code: str
     ticket: str  # connect to /api/rooms/{code}/ws?ticket=…
+
+
+class IceRequest(BaseModel):
+    ticket: str = Field(min_length=1, max_length=2048)
+
+
+class IceResponse(BaseModel):
+    # RTCIceServer entries for new RTCPeerConnection({ iceServers })
+    ice_servers: list[dict[str, Any]]
+    # True: use iceTransportPolicy "relay" (TURN only, peers never see each other's IP)
+    relay: bool
 
 
 class RankResponse(BaseModel):

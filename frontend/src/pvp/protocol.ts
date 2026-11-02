@@ -10,6 +10,9 @@ export interface RoomPlayer {
   ready: boolean;
   connected: boolean;
   wins: number;
+  /** Opted in to video / voice: media only flows for a kind both players turned on */
+  cam: boolean;
+  mic: boolean;
 }
 
 export type PlayerStatus = "ok" | "rejected" | "forfeit";
@@ -39,8 +42,15 @@ export type ServerMessage =
   | ({ t: "state" } & RoomSnapshot)
   | { t: "progress"; seat: number; n: number }
   | ({ t: "result" } & RoundResult)
+  | { t: "signal"; d: RtcSignal }
   | { t: "pong"; c: number; s: number }
   | { t: "error"; code: string };
+
+/** WebRTC signaling relayed by the room. `sid` names one peer connection (a new one per change) */
+export type RtcSignal =
+  | { sid: number; type: "offer"; sdp: string; cam: boolean; mic: boolean }
+  | { sid: number; type: "answer"; sdp: string }
+  | { sid: number; type: "cand"; cand: RTCIceCandidateInit };
 
 export interface FinalRun {
   strokes: number;
@@ -54,7 +64,9 @@ export type ClientMessage =
   | { t: "ping"; c: number }
   | { t: "ready"; v: boolean }
   | { t: "progress"; n: number }
-  | ({ t: "final" } & FinalRun);
+  | ({ t: "final" } & FinalRun)
+  | { t: "media"; cam: boolean; mic: boolean }
+  | { t: "signal"; d: RtcSignal };
 
 /** Close codes from the server (see pvp_room.py) */
 export const CLOSE_REJECTED = 4000;

@@ -10,7 +10,7 @@ from app import clock
 from app.config import Settings
 from app.db import FriendRepository, ProfileRepository, ScoreRepository, UserRepository
 from app.errors import ApiError
-from app.services import accounts, passwords, turnstile
+from app.services import accounts, passwords, rtc, turnstile
 
 HumanVerifier = Callable[[str], Awaitable[bool]]
 
@@ -52,6 +52,10 @@ async def get_session(
 ) -> accounts.Session | None:
     """The logged-in session from the `amb_sid` cookie, or None for guests."""
     return await accounts.current_session(users, amb_sid, clock.now_ms())
+
+
+def get_turn_post() -> rtc.PostJson:
+    return rtc.workers_post_json
 
 
 def get_human_verifier(settings: Annotated[Settings, Depends(get_settings)]) -> HumanVerifier:

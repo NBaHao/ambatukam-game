@@ -15,6 +15,7 @@
   POST /api/rooms              { mode, duration, pid, name }    → { code, ticket }
   POST /api/rooms/{code}/join  { pid, name }                    → { code, ticket }
   GET  /api/rooms/{code}/ws?ticket=   WebSocket, handled by the PvpRoom Durable Object (src/entry.py)
+  POST /api/rooms/{code}/ice   { ticket }                       → { ice_servers, relay }  (503 if no TURN)
 
   GET    /api/friends                                           → { friends, incoming, outgoing }
   POST   /api/friends/{username}                                → { relation }  (request or accept)

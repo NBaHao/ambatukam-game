@@ -82,6 +82,9 @@ class RoomLogic:
                     "ready": p["ready"],
                     "connected": p["connected"],
                     "wins": p["wins"],
+                    # Video / voice opt-ins: media only flows for a kind both players turned on
+                    "cam": p.get("cam", False),
+                    "mic": p.get("mic", False),
                 }
                 for i, p in enumerate(s["players"])
             ],
@@ -125,11 +128,45 @@ class RoomLogic:
                 s["last"] = None
             me = {"pid": ticket.pid, "wins": 0}
             s["players"].append(me)
-        me.update(name=ticket.name, registered=ticket.registered, cid=cid, connected=True, ready=False)
+        # Media opt-ins start off on every connection; the client sends its choice again
+        me.update(
+            name=ticket.name,
+            registered=ticket.registered,
+            cid=cid,
+            connected=True,
+            ready=False,
+            cam=False,
+            mic=False,
+        )
         s["touched"] = now
         if s["match"] is None:
             self._idle_alarm(now)
         return self._states()
+
+    def set_media(self, pid: str, cid: str, cam: object, mic: object, now: int) -> list[Out]:
+        """Opt in / out of sending my camera (cam) or voice (mic) to the opponent."""
+        me = self._is_current(pid, cid)
+        if me is None or not isinstance(cam, bool) or not isinstance(mic, bool):
+            return []
+        if me.get("cam") == cam and me.get("mic") == mic:
+            return []
+        me.update(cam=cam, mic=mic)
+        self._s["touched"] = now
+        return self._states()
+
+    def signal(self, pid: str, cid: str, data: object) -> list[Out]:
+        """WebRTC signaling (offer / answer / ICE candidate), relayed as is to the opponent.
+
+        Only while both players agree on at least one kind of media, so nobody can be sent a
+        connection the other side hasn't agreed to.
+        """
+        me = self._is_current(pid, cid)
+        if me is None or not isinstance(data, dict):
+            return []
+        opp = next((p for p in self._s["players"] if p["pid"] != pid and p["connected"]), None)
+        if opp is None or not any(me.get(k) and opp.get(k) for k in ("cam", "mic")):
+            return []
+        return [Out(opp["pid"], {"t": "signal", "d": data})]
 
     def leave(self, pid: str, cid: str, now: int) -> list[Out]:
         """The connection closed (tab closed, network lost, or the player left)."""
