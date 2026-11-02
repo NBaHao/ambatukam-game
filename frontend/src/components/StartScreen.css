@@ -18,6 +18,7 @@
   .modes { display: grid; grid-template-columns: repeat(3, 1fr); width: 100%; max-width: 360px; }
   .modes button { width: auto; padding: 8px 10px; }
   .modes button:not(:disabled) span { display: none; } /* mô tả chế độ đã có ở đoạn bên dưới */
+  .modes button:last-child { grid-column: span 2; } /* PvP fills the second row instead of leaving a hole */
   .sub { font-size: 14px; }
   .fine { font-size: 11px; margin-top: 0; }
 }

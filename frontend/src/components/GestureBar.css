@@ -6,3 +6,10 @@
 }
 .gbar { margin-top: 10px; height: 2px; background: var(--line); }
 .gbar-fill { height: 100%; width: 0; background: var(--fg); }
+
+/* PvP: start right of the opponent tile so its camera / mic toggles stay tappable */
+.cam-wrap:has(> .pvp-media) .gesture { left: var(--pvp-side); }
+@media (max-width: 640px) {
+  .gesture { top: 8px; left: 8px; right: 8px; padding: 8px 10px 0; font-size: 14px; }
+  .gbar { margin-top: 8px; }
+}

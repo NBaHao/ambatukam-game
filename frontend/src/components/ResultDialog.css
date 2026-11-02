@@ -61,3 +61,11 @@
   .res-num { font-size: 56px; }
   .res-mascot { width: 48px; }
 }
+
+/* Short screens (phone on its side): scroll the dialog instead of squashing its rows */
+.result[open] > * { flex-shrink: 0; }
+@media (max-height: 500px) {
+  .result { padding: 18px 20px 16px; overscroll-behavior: contain; }
+  .res-mascot { width: 44px; }
+  .res-num { font-size: 56px; }
+}

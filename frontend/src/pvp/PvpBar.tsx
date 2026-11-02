@@ -57,20 +57,18 @@ function InviteLink({ code }: { code: string }) {
   );
 }
 
-interface Props {
+interface CamProps {
   session: PvpSession;
   engine: GameEngine;
   phase: Phase;
-  autoInvite?: string;
   onLeave: () => void;
 }
 
-/** Room status over the camera: invite link, opponent state, live score while playing */
-export function PvpBar({ session, engine, phase, autoInvite, onLeave }: Props) {
+/** Over the camera: a room error, or the live score chip while counting down / playing */
+export function PvpBar({ session, engine, phase, onLeave }: CamProps) {
   const { t } = useI18n();
   const view = useStore(session.client.store);
   const error = roomError(view);
-  const room = view.room;
 
   if (error) {
     return (
@@ -84,58 +82,75 @@ export function PvpBar({ session, engine, phase, autoInvite, onLeave }: Props) {
       </div>
     );
   }
+  const room = view.room;
+  const opp = room?.players.find((p) => p.seat !== room.you);
+  if (!opp || (phase !== "playing" && phase !== "countdown")) return null;
+  return <LiveScore engine={engine} opponent={opp.name} opponentCount={view.opponentCount} />;
+}
+
+function LiveScore({ engine, opponent, opponentCount }: { engine: GameEngine; opponent: string; opponentCount: number }) {
+  const { t } = useI18n();
+  const { count } = useStore(engine.hud);
+  return (
+    <div className="pvp-bar live" role="status">
+      <div className="pvp-score">
+        <span className="pvp-me">
+          <small>{t("pvpYou")}</small> <b>{count}</b>
+        </span>
+        <span className="pvp-vs">{t("pvpVs")}</span>
+        <span className="pvp-opp">
+          <b>{opponentCount}</b> <small>{opponent}</small>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+interface CardProps {
+  session: PvpSession;
+  phase: Phase;
+  autoInvite?: string;
+  onLeave: () => void;
+}
+
+/**
+ * Room status while setting up: invite link, opponent state, leave. Sits in the stage grid, so it can
+ * overlay the bottom of the camera on wide screens and drop below it on phones (see Pvp.css)
+ */
+export function PvpRoomCard({ session, phase, autoInvite, onLeave }: CardProps) {
+  const { t } = useI18n();
+  const view = useStore(session.client.store);
+  const room = view.room;
+  // Errors take over the camera; the score chip and the result dialog replace this card
+  if (roomError(view) || phase === "playing" || phase === "countdown" || phase === "result") return null;
   if (!room) {
     return (
-      <div className="pvp-bar" role="status">
+      <div className="pvp-card" role="status">
         <p>{t("pvpConnecting")}</p>
       </div>
     );
   }
-  return <RoomBar view={view} engine={engine} phase={phase} autoInvite={autoInvite} onLeave={onLeave} />;
-}
-
-function RoomBar({ view, engine, phase, autoInvite, onLeave }: Omit<Props, "session"> & { view: RoomView }) {
-  const { t } = useI18n();
-  const { count } = useStore(engine.hud);
-  const room = view.room!;
-  if (phase === "result") return null; // the result dialog takes over
 
   const me = room.players.find((p) => p.seat === room.you);
   const opp = room.players.find((p) => p.seat !== room.you);
-  const live = phase === "playing" || phase === "countdown";
-
   return (
-    <div className={live ? "pvp-bar live" : "pvp-bar"} role="status">
-      {live && opp ? (
-        <div className="pvp-score">
-          <span className="pvp-me">
-            <small>{t("pvpYou")}</small> <b>{count}</b>
-          </span>
-          <span className="pvp-vs">{t("pvpVs")}</span>
-          <span className="pvp-opp">
-            <b>{view.opponentCount}</b> <small>{opp.name}</small>
-          </span>
-        </div>
+    <div className="pvp-card" role="status">
+      <p className="pvp-room">
+        {t("pvpRoomLine", modeName(t, room.mode), room.duration)}
+        {opp && me && ` · ${t("pvpWins", me.wins, opp.wins)}`}
+      </p>
+      {view.status === "reconnecting" ? (
+        <p>{t("pvpReconnecting")}</p>
       ) : (
-        <>
-          <p className="pvp-room">
-            {t("pvpRoomLine", modeName(t, room.mode), room.duration)}
-            {opp && me && ` · ${t("pvpWins", me.wins, opp.wins)}`}
-          </p>
-          {view.status === "reconnecting" ? (
-            <p>{t("pvpReconnecting")}</p>
-          ) : (
-            <p>
-              <Rich text={opponentLine(t, view)} />
-            </p>
-          )}
-          {!opp && <InviteLink code={room.code} />}
-          {!opp && <RoomInvites code={room.code} mode={room.mode} duration={room.duration} autoInvite={autoInvite} />}
-          <button type="button" className="link" onClick={onLeave}>
-            {t("pvpLeave")}
-          </button>
-        </>
+        <p>
+          <Rich text={opponentLine(t, view)} />
+        </p>
       )}
+      {!opp && <InviteLink code={room.code} />}
+      {!opp && <RoomInvites code={room.code} mode={room.mode} duration={room.duration} autoInvite={autoInvite} />}
+      <button type="button" className="link" onClick={onLeave}>
+        {t("pvpLeave")}
+      </button>
     </div>
   );
 }
