@@ -13,7 +13,12 @@ from app import rules
 from app.services.tokens import sign_payload, verify_payload
 
 ROOM_CODE_RE = re.compile(rules.ROOM_CODE_PATTERN)
-_KIND = "room"
+# The lobby (presence, invites) uses the same tickets with this "room"; it can't be a room code
+LOBBY = "lobby"
+
+
+def _kind(room: str) -> str:
+    return "lobby" if room == LOBBY else "room"
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,7 +39,7 @@ def new_room_code() -> str:
 
 def issue(secret: str, ticket: Ticket) -> str:
     payload: dict[str, object] = {
-        "k": _KIND,
+        "k": _kind(ticket.room),
         "r": ticket.room,
         "p": ticket.pid,
         "n": ticket.name,
@@ -49,7 +54,7 @@ def issue(secret: str, ticket: Ticket) -> str:
 def verify(secret: str, token: str, room: str, now_ms: int) -> Ticket | None:
     """The ticket if it is genuine, for this room and not expired."""
     p = verify_payload(secret, token)
-    if p is None or p.get("k") != _KIND or p.get("r") != room:
+    if p is None or p.get("k") != _kind(room) or p.get("r") != room:
         return None
     pid, name, registered, expires = p.get("p"), p.get("n"), p.get("u"), p.get("e")
     if not (isinstance(pid, str) and isinstance(name, str) and isinstance(registered, bool)):

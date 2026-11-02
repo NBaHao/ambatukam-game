@@ -1,11 +1,14 @@
 // Gọi API leaderboard (backend FastAPI, cùng tên miền). Lỗi trả về dạng { error: "<code>" }.
 import { config } from "../config";
 import type {
+  FriendsResponse,
   LeaderboardResponse,
   LoginRequest,
   MeResponse,
+  Profile,
   RankResponse,
   RegisterRequest,
+  Relation,
   RoomTicket,
   ScoreRequest,
   SessionRequest,
@@ -55,10 +58,21 @@ export const api = {
   register: (body: RegisterRequest) => post<MeResponse>("/api/auth/register", body),
   login: (body: LoginRequest) => post<MeResponse>("/api/auth/login", body),
   logout: () => post<MeResponse>("/api/auth/logout", {}),
+  profile: (username: string, signal?: AbortSignal) =>
+    request<Profile>(`/api/users/${encodeURIComponent(username)}`, { signal }),
 
   // PvP: a signed ticket for the room socket (roomSocketUrl in src/pvp/RoomClient.ts)
   createRoom: (body: { mode: string; duration: number; pid: string; name: string }) =>
     post<RoomTicket>("/api/rooms", body),
   joinRoom: (code: string, body: { pid: string; name: string }) =>
     post<RoomTicket>(`/api/rooms/${encodeURIComponent(code)}/join`, body),
+
+  // Friends (logged in only) and the lobby socket ticket (src/friends/FriendsHub.ts)
+  friends: () => request<FriendsResponse>("/api/friends"),
+  addFriend: (username: string) =>
+    post<{ relation: Relation }>(`/api/friends/${encodeURIComponent(username)}`, {}).then((d) => d.relation),
+  removeFriend: (username: string) =>
+    request<{ relation: Relation }>(`/api/friends/${encodeURIComponent(username)}`, { method: "DELETE" }),
+  lobbyTicket: (body: { pid: string; name: string }) =>
+    post<{ ticket: string; name: string }>("/api/lobby", body).then((d) => d.ticket),
 };

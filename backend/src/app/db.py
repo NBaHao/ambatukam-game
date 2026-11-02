@@ -279,3 +279,175 @@ class MatchRepository:
                 ),
             ]
         )
+
+
+# ---------- Profiles ----------
+
+# Every best score of a player, with its current rank on that board
+_PROFILE_RECORDS = """
+SELECT s.mode, s.duration, s.score, s.strokes,
+  (SELECT COUNT(*) FROM scores o WHERE o.mode = s.mode AND o.duration = s.duration
+     AND (o.score > s.score OR (o.score = s.score AND o.updated_at < s.updated_at))) + 1 AS rank,
+  (SELECT COUNT(*) FROM scores o WHERE o.mode = s.mode AND o.duration = s.duration) AS total
+FROM scores s WHERE s.pid = ?1
+"""
+
+_PROFILE_PVP = """
+SELECT COUNT(*) AS played,
+  COALESCE(SUM(result = 'win'), 0) AS wins,
+  COALESCE(SUM(result = 'loss'), 0) AS losses,
+  COALESCE(SUM(result = 'draw'), 0) AS draws
+FROM match_players WHERE pid = ?1
+"""
+
+# Latest rounds with the opponent; the opponent's username only if they played as that account
+_PROFILE_MATCHES = """
+SELECT m.id, m.mode, m.duration, me.ended_at, me.result, me.status, me.strokes,
+  op.name AS opp_name, op.strokes AS opp_strokes, op.status AS opp_status, u.username AS opp_username
+FROM match_players me
+JOIN matches m ON m.id = me.match_id
+LEFT JOIN match_players op ON op.match_id = me.match_id AND op.pid != me.pid
+LEFT JOIN users u ON u.pid = op.pid AND op.registered = 1
+WHERE me.pid = ?1
+ORDER BY me.ended_at DESC
+LIMIT ?2
+"""
+
+_RECORD_KEYS = ("mode", "duration", "score", "strokes", "rank", "total")
+_MATCH_KEYS = (
+    "id",
+    "mode",
+    "duration",
+    "ended_at",
+    "result",
+    "status",
+    "strokes",
+    "opp_name",
+    "opp_strokes",
+    "opp_status",
+    "opp_username",
+)
+
+
+class ProfileRepository:
+    def __init__(self, db: D1Database) -> None:
+        self._db = db
+
+    async def stats(self, pid: str, history: int) -> dict[str, Any]:
+        """Records, PvP totals and the latest `history` PvP rounds of one player id."""
+        records, pvp, matches = await self._db.batch(
+            [
+                self._db.prepare(_PROFILE_RECORDS).bind(pid),
+                self._db.prepare(_PROFILE_PVP).bind(pid),
+                self._db.prepare(_PROFILE_MATCHES).bind(pid, history),
+            ]
+        )
+        totals = _rows(pvp)[0]
+        return {
+            "records": [{k: r[k] for k in _RECORD_KEYS} for r in _rows(records)],
+            "pvp": {k: int(totals[k] or 0) for k in ("played", "wins", "losses", "draws")},
+            "matches": [{k: r[k] for k in _MATCH_KEYS} for r in _rows(matches)],
+        }
+
+
+# ---------- Friends ----------
+
+_FRIEND_ROWS = """
+SELECT u.username, f.created_at, f.accepted_at, 1 AS outgoing
+FROM friendships f JOIN users u ON u.id = f.addressee_id WHERE f.requester_id = ?1
+UNION ALL
+SELECT u.username, f.created_at, f.accepted_at, 0 AS outgoing
+FROM friendships f JOIN users u ON u.id = f.requester_id WHERE f.addressee_id = ?1
+"""
+
+_BETWEEN = """
+SELECT requester_id, addressee_id, accepted_at FROM friendships
+WHERE (requester_id = ?1 AND addressee_id = ?2) OR (requester_id = ?2 AND addressee_id = ?1)
+"""
+
+_FRIEND_COUNTS = """
+SELECT
+  (SELECT COUNT(*) FROM friendships
+     WHERE accepted_at IS NOT NULL AND (requester_id = ?1 OR addressee_id = ?1)) AS friends,
+  (SELECT COUNT(*) FROM friendships WHERE accepted_at IS NULL AND requester_id = ?1) AS outgoing
+"""
+
+# By username, for the lobby (which only knows usernames)
+_FRIEND_NAMES = """
+SELECT u.username FROM friendships f JOIN users u ON u.id = f.addressee_id
+WHERE f.requester_id = (SELECT id FROM users WHERE username = ?1) AND f.accepted_at IS NOT NULL
+UNION
+SELECT u.username FROM friendships f JOIN users u ON u.id = f.requester_id
+WHERE f.addressee_id = (SELECT id FROM users WHERE username = ?1) AND f.accepted_at IS NOT NULL
+"""
+
+_NAMES_BETWEEN = """
+SELECT f.accepted_at FROM friendships f
+JOIN users a ON a.username = ?1 JOIN users b ON b.username = ?2
+WHERE (f.requester_id = a.id AND f.addressee_id = b.id) OR (f.requester_id = b.id AND f.addressee_id = a.id)
+"""
+
+
+class FriendRepository:
+    def __init__(self, db: D1Database) -> None:
+        self._db = db
+
+    async def rows(self, uid: str) -> list[dict[str, Any]]:
+        """Every friendship row of `uid`: username of the other side, created_at, accepted_at, outgoing."""
+        res = await self._db.prepare(_FRIEND_ROWS).bind(uid).all()
+        keys = ("username", "created_at", "accepted_at", "outgoing")
+        return [{k: r[k] for k in keys} for r in _rows(res)]
+
+    async def between(self, a: str, b: str) -> list[dict[str, Any]]:
+        res = await self._db.prepare(_BETWEEN).bind(a, b).all()
+        return [{k: r[k] for k in ("requester_id", "addressee_id", "accepted_at")} for r in _rows(res)]
+
+    async def counts(self, uid: str) -> dict[str, int]:
+        row = _rows(await self._db.prepare(_FRIEND_COUNTS).bind(uid).all())[0]
+        return {"friends": int(row["friends"]), "outgoing": int(row["outgoing"])}
+
+    async def create(self, requester: str, addressee: str, now: int) -> None:
+        await (
+            self._db.prepare(
+                "INSERT INTO friendships (requester_id, addressee_id, created_at) VALUES (?1, ?2, ?3) "
+                "ON CONFLICT DO NOTHING"
+            )
+            .bind(requester, addressee, now)
+            .all()
+        )
+
+    async def accept(self, requester: str, addressee: str, now: int) -> None:
+        """Accept `requester`'s request and drop a crossing request the other way, if any."""
+        await self._db.batch(
+            [
+                self._db.prepare(
+                    "UPDATE friendships SET accepted_at = ?3 "
+                    "WHERE requester_id = ?1 AND addressee_id = ?2 AND accepted_at IS NULL"
+                ).bind(requester, addressee, now),
+                self._db.prepare(
+                    "DELETE FROM friendships "
+                    "WHERE requester_id = ?2 AND addressee_id = ?1 AND accepted_at IS NULL"
+                ).bind(requester, addressee),
+            ]
+        )
+
+    async def delete(self, a: str, b: str) -> None:
+        await (
+            self._db.prepare(
+                "DELETE FROM friendships "
+                "WHERE (requester_id = ?1 AND addressee_id = ?2) OR (requester_id = ?2 AND addressee_id = ?1)"
+            )
+            .bind(a, b)
+            .all()
+        )
+
+    async def friend_names(self, username: str) -> list[str]:
+        """Usernames of `username`'s friends (accepted only)."""
+        return [r["username"] for r in _rows(await self._db.prepare(_FRIEND_NAMES).bind(username).all())]
+
+    async def link(self, a: str, b: str) -> str | None:
+        """Between two usernames: "friends", "pending" (a request either way) or None."""
+        rows = _rows(await self._db.prepare(_NAMES_BETWEEN).bind(a, b).all())
+        if not rows:
+            return None
+        return "friends" if any(r["accepted_at"] is not None for r in rows) else "pending"

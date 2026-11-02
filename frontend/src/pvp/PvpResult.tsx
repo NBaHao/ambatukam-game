@@ -7,6 +7,7 @@ import { useStore } from "../hooks/useStore";
 import { useI18n } from "../i18n/context";
 import { Rich } from "../i18n/Rich";
 import type { TextKey } from "../i18n/strings";
+import { profilePath } from "../lib/route";
 import { modeName } from "../lib/share";
 import type { PlayerStatus } from "./protocol";
 import type { PvpSession } from "./PvpSession";
@@ -78,7 +79,18 @@ export function PvpResult({ session, engine, open, onLeave }: Props) {
           const status = STATUS[p.status];
           return (
             <li key={p.seat} className={[p.seat === room?.you && "me", p.result === "win" && "win"].filter(Boolean).join(" ")}>
-              <span className="pvp-pname">{p.seat === room?.you ? `${p.name} (${t("pvpYou")})` : p.name}</span>
+              <span className="pvp-pname">
+                {p.seat === room?.you ? (
+                  `${p.name} (${t("pvpYou")})`
+                ) : room?.players.find((x) => x.seat === p.seat)?.registered ? (
+                  // New tab: following the link here would leave the room
+                  <a href={profilePath(p.name)} target="_blank" rel="noopener" title={t("profView", p.name)}>
+                    {p.name}
+                  </a>
+                ) : (
+                  p.name
+                )}
+              </span>
               <span className="pvp-pnum">{p.strokes}</span>
               {status && <span className="pvp-pstatus">{t(status)}</span>}
             </li>

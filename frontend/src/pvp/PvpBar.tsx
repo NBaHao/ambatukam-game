@@ -4,6 +4,7 @@ import { useStore } from "../hooks/useStore";
 import { useI18n, type Translate } from "../i18n/context";
 import { Rich } from "../i18n/Rich";
 import type { TextKey } from "../i18n/strings";
+import { RoomInvites } from "../friends/RoomInvites";
 import { roomPath } from "../lib/route";
 import { modeName } from "../lib/share";
 import type { RoomView } from "./RoomClient";
@@ -60,11 +61,12 @@ interface Props {
   session: PvpSession;
   engine: GameEngine;
   phase: Phase;
+  autoInvite?: string;
   onLeave: () => void;
 }
 
 /** Room status over the camera: invite link, opponent state, live score while playing */
-export function PvpBar({ session, engine, phase, onLeave }: Props) {
+export function PvpBar({ session, engine, phase, autoInvite, onLeave }: Props) {
   const { t } = useI18n();
   const view = useStore(session.client.store);
   const error = roomError(view);
@@ -89,10 +91,10 @@ export function PvpBar({ session, engine, phase, onLeave }: Props) {
       </div>
     );
   }
-  return <RoomBar view={view} engine={engine} phase={phase} onLeave={onLeave} />;
+  return <RoomBar view={view} engine={engine} phase={phase} autoInvite={autoInvite} onLeave={onLeave} />;
 }
 
-function RoomBar({ view, engine, phase, onLeave }: { view: RoomView; engine: GameEngine; phase: Phase; onLeave: () => void }) {
+function RoomBar({ view, engine, phase, autoInvite, onLeave }: Omit<Props, "session"> & { view: RoomView }) {
   const { t } = useI18n();
   const { count } = useStore(engine.hud);
   const room = view.room!;
@@ -128,6 +130,7 @@ function RoomBar({ view, engine, phase, onLeave }: { view: RoomView; engine: Gam
             </p>
           )}
           {!opp && <InviteLink code={room.code} />}
+          {!opp && <RoomInvites code={room.code} mode={room.mode} duration={room.duration} autoInvite={autoInvite} />}
           <button type="button" className="link" onClick={onLeave}>
             {t("pvpLeave")}
           </button>

@@ -159,5 +159,79 @@ class MeResponse(BaseModel):
     user: User | None
 
 
+class ProfileRecord(BaseModel):
+    mode: str
+    duration: int
+    score: float
+    strokes: int
+    rank: int
+    total: int
+
+
+class PvpTotals(BaseModel):
+    played: int
+    wins: int
+    losses: int
+    draws: int
+
+
+class ProfileOpponent(BaseModel):
+    name: str
+    username: str | None  # set when they played logged in: link to their profile
+    strokes: int
+    status: str
+
+
+class ProfileMatch(BaseModel):
+    id: str
+    mode: str
+    duration: int
+    ended_at: int
+    result: str  # win | loss | draw
+    status: str  # ok | rejected | forfeit
+    strokes: int
+    opponent: ProfileOpponent | None
+
+
+class ProfileResponse(BaseModel):
+    username: str
+    joined_at: int
+    records: list[ProfileRecord]
+    pvp: PvpTotals
+    matches: list[ProfileMatch]
+    # How the logged-in viewer relates to this account (None for guests)
+    relation: Literal["self", "friends", "outgoing", "incoming", "none"] | None = None
+
+
+class Friend(BaseModel):
+    username: str
+    since: int
+
+
+class FriendRequest(BaseModel):
+    username: str
+    at: int
+
+
+class FriendsResponse(BaseModel):
+    friends: list[Friend]
+    incoming: list[FriendRequest]
+    outgoing: list[FriendRequest]
+
+
+class FriendActionResponse(BaseModel):
+    relation: Literal["friends", "outgoing", "none"]
+
+
+class LobbyRequest(BaseModel):
+    pid: PlayerId
+    name: PlayerName
+
+
+class LobbyTicketResponse(BaseModel):
+    ticket: str
+    name: str  # what others see: the username, or the cleaned guest name
+
+
 class ErrorResponse(BaseModel):
     error: str

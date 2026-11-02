@@ -8,7 +8,7 @@ from fastapi import Cookie, Depends, Request
 
 from app import clock
 from app.config import Settings
-from app.db import ScoreRepository, UserRepository
+from app.db import FriendRepository, ProfileRepository, ScoreRepository, UserRepository
 from app.errors import ApiError
 from app.services import accounts, passwords, turnstile
 
@@ -32,6 +32,14 @@ def get_repository(env: Env) -> ScoreRepository:
 
 def get_users(env: Env) -> UserRepository:
     return UserRepository(env.DB)
+
+
+def get_profiles(env: Env) -> ProfileRepository:
+    return ProfileRepository(env.DB)
+
+
+def get_friends(env: Env) -> FriendRepository:
+    return FriendRepository(env.DB)
 
 
 def get_kdf() -> passwords.Kdf:
@@ -69,5 +77,16 @@ SettingsDep = Annotated[Settings, Depends(get_settings)]
 RepositoryDep = Annotated[ScoreRepository, Depends(get_repository)]
 HumanVerifierDep = Annotated[HumanVerifier, Depends(get_human_verifier)]
 UsersDep = Annotated[UserRepository, Depends(get_users)]
+ProfilesDep = Annotated[ProfileRepository, Depends(get_profiles)]
+FriendsDep = Annotated[FriendRepository, Depends(get_friends)]
 KdfDep = Annotated[passwords.Kdf, Depends(get_kdf)]
 SessionDep = Annotated[accounts.Session | None, Depends(get_session)]
+
+
+def require_login(session: SessionDep) -> accounts.Session:
+    if session is None:
+        raise ApiError("login_required", 401)
+    return session
+
+
+LoginDep = Annotated[accounts.Session, Depends(require_login)]
