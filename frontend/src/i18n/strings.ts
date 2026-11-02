@@ -190,6 +190,14 @@ const en = {
   profAcceptFriend: "Accept friend request",
   profFriends: "Friends",
   profUnfriend: "Unfriend",
+  rtcCam: "Show my camera",
+  rtcMic: "Voice chat",
+  rtcHint: "Your face and voice only reach your opponent if you both turn them on. Until then you each see a mascot.",
+  rtcWantsCam: (n: string) => `**${n}** wants to see you on camera`,
+  rtcWantsMic: (n: string) => `**${n}** wants to talk`,
+  rtcMicError: "Couldn't use the microphone.",
+  rtcConnecting: "Connecting video…",
+  rtcFailed: "Video connection failed",
   tiers: ["Turtle", "Warming up", "Ambatu…", "Ambatukam!", "Iron hand", "Legend"],
 };
 
@@ -384,6 +392,14 @@ const vi: Strings = {
   profAcceptFriend: "Đồng ý kết bạn",
   profFriends: "Bạn bè",
   profUnfriend: "Huỷ kết bạn",
+  rtcCam: "Bật camera của tôi",
+  rtcMic: "Nói chuyện",
+  rtcHint: "Mặt và giọng của bạn chỉ tới đối thủ khi cả hai cùng bật. Trước đó hai bên chỉ thấy mascot.",
+  rtcWantsCam: (n) => `**${n}** muốn thấy bạn qua camera`,
+  rtcWantsMic: (n) => `**${n}** muốn nói chuyện`,
+  rtcMicError: "Không dùng được micro.",
+  rtcConnecting: "Đang kết nối video…",
+  rtcFailed: "Kết nối video thất bại",
   // Danh hiệu theo tốc độ, thấp → cao (ngưỡng ở TIER_MIN / RND_TIER_SEC)
   tiers: ["Rùa bò", "Khởi động", "Ambatu…", "Ambatukam!", "Tay thép", "Huyền thoại"],
 };

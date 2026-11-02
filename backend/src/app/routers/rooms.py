@@ -3,9 +3,17 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Path
 
 from app import clock, rules
-from app.dependencies import SessionDep, SettingsDep, UsersDep, rate_limit
-from app.schemas import CreateRoomRequest, JoinRoomRequest, RoomCode, RoomTicketResponse
-from app.services import accounts, tickets
+from app.dependencies import SessionDep, SettingsDep, UsersDep, get_turn_post, rate_limit
+from app.errors import ApiError
+from app.schemas import (
+    CreateRoomRequest,
+    IceRequest,
+    IceResponse,
+    JoinRoomRequest,
+    RoomCode,
+    RoomTicketResponse,
+)
+from app.services import accounts, rtc, tickets
 
 router = APIRouter(tags=["pvp"])
 
@@ -48,3 +56,20 @@ async def join_room(
 ) -> RoomTicketResponse:
     """A ticket to join an existing room (the socket reports `room_not_found` if there is none)."""
     return await _ticket(settings, users, login, code, body.pid, body.name)
+
+
+@router.post("/rooms/{code}/ice", dependencies=[Depends(rate_limit("SESSION_LIMIT"))])
+async def ice_servers(
+    code: Annotated[RoomCode, Path()],
+    body: IceRequest,
+    settings: SettingsDep,
+    post_json: Annotated[rtc.PostJson, Depends(get_turn_post)],
+) -> IceResponse:
+    """ICE servers for video / voice with the opponent (players in this room only).
+
+    503 `rtc_unavailable` when TURN isn't configured: the client hides the camera / mic toggles.
+    """
+    if tickets.verify(settings.token_secret, body.ticket, code, clock.now_ms()) is None:
+        raise ApiError("bad_ticket", 403)
+    cfg = rtc.RtcConfig(settings.turn_key_id, settings.turn_api_token, settings.rtc_allow_direct)
+    return IceResponse(**await rtc.ice_servers(cfg, post_json))

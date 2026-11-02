@@ -24,6 +24,7 @@ import { loadTurnstile } from "./lib/turnstile";
 import { navigate, roomPath, useRoute } from "./lib/route";
 import { PvpBar } from "./pvp/PvpBar";
 import { PvpLobby } from "./pvp/PvpLobby";
+import { PvpMedia } from "./pvp/PvpMedia";
 import { PvpResult } from "./pvp/PvpResult";
 import type { PvpMode } from "./pvp/protocol";
 import { usePvp } from "./pvp/usePvp";
@@ -166,6 +167,10 @@ export function App() {
   const showGesture =
     ui.gesture && (phase === "ready" || phase === "anchor" || phase === "waiting" || phase === "countdown");
   const roomMode = pvp.session?.client.store.get().room?.mode;
+  const camera = useCallback(() => {
+    const stream = videoRef.current?.srcObject;
+    return stream instanceof MediaStream ? stream : null;
+  }, []);
   const camStyle = ui.aspect ? ({ "--cam-aspect": ui.aspect } as CSSProperties) : undefined;
 
   return (
@@ -203,6 +208,14 @@ export function App() {
                   onCancel={exitPvp}
                   onLogin={openAccount}
                   onTypingChange={setTyping}
+                />
+              )}
+              {pvp.session && (
+                <PvpMedia
+                  key={pvp.session.id}
+                  session={pvp.session}
+                  camera={camera}
+                  controls={phase !== "countdown" && phase !== "playing"}
                 />
               )}
               {pvp.session && (

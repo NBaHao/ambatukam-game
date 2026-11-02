@@ -68,8 +68,9 @@ Khi thêm biến mới: thêm vào `.env.example`, khai báo kiểu trong `src/v
 |---|---|---|
 | `TOKEN_SECRET` | `cd backend && openssl rand -hex 32 \| uv run pywrangler secret put TOKEN_SECRET` | `backend/.dev.vars` |
 | `TURNSTILE_SECRET` | `cd backend && uv run pywrangler secret put TURNSTILE_SECRET` (Cloudflare dashboard → Turnstile → widget) | `backend/.dev.vars` (khoá thử `1x0000000000000000000000000000000AA`) |
+| `TURN_KEY_ID`, `TURN_KEY_API_TOKEN` (optional: PvP video / voice) | Cloudflare dashboard → Realtime → TURN → create key, then `uv run pywrangler secret put` each | not needed: `RTC_ALLOW_DIRECT=1` in `.dev.vars` tries WebRTC without TURN (never in production: it exposes IPs) |
 
-`backend/.dev.vars` đã gitignore; `make install` tạo từ `backend/.dev.vars.example`. Đọc secret qua `Settings.from_env` (`src/app/config.py`), thiếu thì lỗi 500 rõ ràng.
+`backend/.dev.vars` đã gitignore; `make install` tạo từ `backend/.dev.vars.example`. Đọc secret qua `Settings.from_env` (`src/app/config.py`), thiếu thì lỗi 500 rõ ràng (optional secrets such as TURN just turn their feature off).
 Không in secret ra log, không dán vào issue/PR.
 
 Khoá Turnstile thử của Cloudflare (luôn qua): sitekey `1x00000000000000000000AA`, secret `1x0000000000000000000000000000000AA`.
@@ -106,7 +107,7 @@ Chrome headless không có WebGL thì MediaPipe lỗi (`activeTexture`); chạy 
 - Kiểu trong `frontend/src/api/types.ts` ↔ `backend/src/app/schemas.py`; mã lỗi `REJECTED_CODES` ↔ các `ApiError(...)` trong `routers/scores.py`.
 - Account rules: `USERNAME_RE`, `RESERVED_PREFIX`, `PASSWORD_MIN/MAX` in `frontend/src/api/types.ts` ↔ `rules.py`; error codes in `AccountDialog.tsx` / `useScoreSubmission.ts` ↔ `ApiError(...)` in `services/accounts.py` and `routers/auth.py`; friend error codes in `FriendsDialog.tsx` ↔ `services/friends.py`.
 - PvP socket messages: `frontend/src/pvp/protocol.ts` ↔ `backend/src/app/services/room.py` / `src/pvp_room.py`
-  (state, progress, result, pong, error; close codes 4000/4001). Room code format: `ROOM_CODE_*` in `rules.py`
+  (state, progress, result, media, signal, pong, error; close codes 4000/4001). Room code format: `ROOM_CODE_*` in `rules.py`
   ↔ the `/c/` pattern in `frontend/src/lib/route.ts`. `PVP_START_DELAY_MS` must stay longer than the client
   countdown (`COUNTDOWN_LEAD_MS` in `GameEngine.ts`).
 - Lobby socket messages: `frontend/src/friends/protocol.ts` ↔ `backend/src/app/services/lobby.py` / `src/lobby_room.py`

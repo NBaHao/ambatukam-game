@@ -11,6 +11,7 @@ import {
   type FinalRun,
   type RoomSnapshot,
   type RoundResult,
+  type RtcSignal,
   type ServerMessage,
 } from "./protocol";
 
@@ -56,7 +57,11 @@ export class RoomClient {
   private pingTimer = 0;
 
   readonly code: string;
-  private readonly ticket: string;
+  readonly ticket: string;
+  /** Video / voice I want to share; sent again whenever the room's copy differs (it resets on reconnect) */
+  private media = { cam: false, mic: false };
+  /** WebRTC signaling from the opponent (RtcLink) */
+  onSignal: ((d: RtcSignal) => void) | null = null;
 
   constructor(code: string, ticket: string) {
     this.code = code;
@@ -113,6 +118,8 @@ export class RoomClient {
         const prev = this.store.get().room;
         const newMatch = room.match && room.match.round !== prev?.match?.round;
         this.store.update({ room, ...(newMatch ? { opponentCount: 0, result: null } : {}) });
+        const me = room.players.find((p) => p.seat === room.you);
+        if (me && (me.cam !== this.media.cam || me.mic !== this.media.mic)) this.send({ t: "media", ...this.media });
         break;
       }
       case "progress":
@@ -123,6 +130,9 @@ export class RoomClient {
         this.store.update({ result });
         break;
       }
+      case "signal":
+        this.onSignal?.(msg.d);
+        break;
       case "pong":
         this.clock.add(msg.c, Date.now(), msg.s);
         break;
@@ -154,6 +164,15 @@ export class RoomClient {
 
   final(run: FinalRun): void {
     this.send({ t: "final", ...run });
+  }
+
+  setMedia(cam: boolean, mic: boolean): void {
+    this.media = { cam, mic };
+    this.send({ t: "media", cam, mic });
+  }
+
+  signal(d: RtcSignal): void {
+    this.send({ t: "signal", d });
   }
 
   /** GO of the running match in local Date.now() time, or null */
