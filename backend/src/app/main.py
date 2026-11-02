@@ -10,11 +10,17 @@
   POST /api/auth/login    { username, password }                → { user }  (sets amb_sid cookie)
   POST /api/auth/logout                                         → { user: null }
   GET  /api/me                                                  → { user | null }
-  GET  /api/users/{username}   → { username, joined_at, records, pvp, matches }  (public profile)
+  GET  /api/users/{username}   → { username, joined_at, records, pvp, matches, relation }  (public profile)
 
   POST /api/rooms              { mode, duration, pid, name }    → { code, ticket }
   POST /api/rooms/{code}/join  { pid, name }                    → { code, ticket }
   GET  /api/rooms/{code}/ws?ticket=   WebSocket, handled by the PvpRoom Durable Object (src/entry.py)
+
+  GET    /api/friends                                           → { friends, incoming, outgoing }
+  POST   /api/friends/{username}                                → { relation }  (request or accept)
+  DELETE /api/friends/{username}                                → { relation: "none" }
+  POST   /api/lobby          { pid, name }                      → { ticket, name }
+  GET    /api/lobby/ws?ticket=        WebSocket, the Lobby Durable Object: presence, invites, matchmaking
 
 Tài liệu OpenAPI: /api/docs. Game và API cùng tên miền nên không cần CORS
 (chạy local thì Vite proxy /api sang Worker).

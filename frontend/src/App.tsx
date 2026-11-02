@@ -12,6 +12,8 @@ import { Profile } from "./components/Profile";
 import { ReadyScreen } from "./components/ReadyScreen";
 import { ResultDialog, type FinishedRun } from "./components/ResultDialog";
 import { StartScreen } from "./components/StartScreen";
+import { FriendsDialog } from "./friends/FriendsDialog";
+import { InviteToasts } from "./friends/InviteToasts";
 import { ambatu, ambatukamFinish } from "./game/audio";
 import { MODES, isTimed, type Duration, type Mode } from "./game/types";
 import { useGameEngine } from "./hooks/useGameEngine";
@@ -19,7 +21,7 @@ import { useStore } from "./hooks/useStore";
 import { summarize } from "./lib/scoring";
 import { storage } from "./lib/storage";
 import { loadTurnstile } from "./lib/turnstile";
-import { navigate, useRoute } from "./lib/route";
+import { navigate, roomPath, useRoute } from "./lib/route";
 import { PvpBar } from "./pvp/PvpBar";
 import { PvpLobby } from "./pvp/PvpLobby";
 import { PvpResult } from "./pvp/PvpResult";
@@ -72,8 +74,12 @@ export function App() {
   useEffect(() => {
     pvpRef.current = pvp.session;
   }, [pvp.session]);
-  const [hostLobby, setHostLobby] = useState(false);
+  // Host lobby open, maybe to challenge a friend; that friend is invited once the room exists
+  const [hostLobby, setHostLobby] = useState<{ invite?: string } | null>(null);
+  const [autoInvite, setAutoInvite] = useState<string | undefined>();
   const lobby = pvp.entered ? null : route.name === "room" ? "join" : hostLobby ? "host" : null;
+  const [friendsOpen, setFriendsOpen] = useState(false);
+  const closeFriends = useCallback(() => setFriendsOpen(false), []);
   const { leave: leavePvp } = pvp;
   // Back button (or any route change) out of the room: leave it
   useEffect(() => {
@@ -81,9 +87,31 @@ export function App() {
   }, [route.name, leavePvp]);
   const exitPvp = useCallback(() => {
     leavePvp();
-    setHostLobby(false);
+    setHostLobby(null);
+    setAutoInvite(undefined);
     navigate("/");
   }, [leavePvp]);
+  const challenge = useCallback(
+    (username: string) => {
+      if (pvpRef.current) leavePvp();
+      engine.goIdle();
+      setView("game");
+      setHostLobby({ invite: username });
+      navigate("/");
+    },
+    [engine, leavePvp],
+  );
+  // Accepted a friend's invite: straight into their room
+  const joinInvite = useCallback(
+    (code: string, ticket: string) => {
+      setHostLobby(null);
+      setAutoInvite(undefined);
+      setView("game");
+      navigate(roomPath(code));
+      pvp.open(code, ticket);
+    },
+    [pvp],
+  );
 
   useEffect(() => {
     engine.setHandlers({
@@ -111,8 +139,10 @@ export function App() {
 
   // Đang xem bảng xếp hạng / gõ tên / mở hộp tài khoản thì không bắt cử chỉ xòe tay
   useEffect(() => {
-    engine.setGesturesEnabled(view === "game" && route.name !== "profile" && !typing && !showAccount && !lobby);
-  }, [engine, view, route.name, typing, showAccount, lobby]);
+    engine.setGesturesEnabled(
+      view === "game" && route.name !== "profile" && !typing && !showAccount && !friendsOpen && !lobby,
+    );
+  }, [engine, view, route.name, typing, showAccount, friendsOpen, lobby]);
 
   useEffect(() => {
     if (!DEBUG) return;
@@ -140,7 +170,7 @@ export function App() {
 
   return (
     <>
-      <Header onAccount={openAccount} />
+      <Header onAccount={openAccount} onFriends={() => setFriendsOpen(true)} />
       <main className="stage">
         <section className={pvp.entered ? "cam-wrap pvp" : "cam-wrap"} style={camStyle}>
           <video ref={videoRef} className="cam-video" playsInline muted />
@@ -162,10 +192,12 @@ export function App() {
                   key={lobby + (route.name === "room" ? route.code : "")}
                   kind={lobby}
                   code={route.name === "room" ? route.code : undefined}
+                  inviteTo={lobby === "host" ? hostLobby?.invite : undefined}
                   initialMode={mode === "double" ? "double" : "single"}
                   initialDuration={duration}
                   onOpen={(code, ticket) => {
-                    setHostLobby(false);
+                    setAutoInvite(lobby === "host" ? hostLobby?.invite : undefined);
+                    setHostLobby(null);
                     pvp.open(code, ticket);
                   }}
                   onCancel={exitPvp}
@@ -173,7 +205,9 @@ export function App() {
                   onTypingChange={setTyping}
                 />
               )}
-              {pvp.session && <PvpBar session={pvp.session} engine={engine} phase={phase} onLeave={exitPvp} />}
+              {pvp.session && (
+                <PvpBar session={pvp.session} engine={engine} phase={phase} autoInvite={autoInvite} onLeave={exitPvp} />
+              )}
               {phase === "idle" && !lobby && !pvp.entered && (
                 <StartScreen
                   mode={mode}
@@ -182,7 +216,7 @@ export function App() {
                   onDurationChange={setDuration}
                   onStart={() => void engine.begin({ mode, duration })}
                   onOpenBoard={() => setView("board")}
-                  onPvp={() => setHostLobby(true)}
+                  onPvp={() => setHostLobby({})}
                 />
               )}
               {phase === "ready" && <ReadyScreen boot={ui.boot} />}
@@ -214,6 +248,8 @@ export function App() {
       )}
 
       <AccountDialog key={accountKey} open={showAccount} onClose={closeAccount} />
+      <FriendsDialog open={friendsOpen} onClose={closeFriends} onLogin={openAccount} onChallenge={challenge} />
+      {phase !== "countdown" && phase !== "playing" && <InviteToasts onJoin={joinInvite} />}
 
       {DEBUG && (
         <Suspense>

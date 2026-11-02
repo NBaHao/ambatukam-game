@@ -1,0 +1,50 @@
+/* Friends dialog (built on the account dialog), header badge, invite toasts, room invites */
+.friends { width: min(380px, calc(100vw - 24px)); }
+.friends h3 { margin: 0 0 6px; font-size: 12px; color: var(--mute); text-transform: uppercase; letter-spacing: .08em; text-align: left; }
+.fr-add { flex-direction: row !important; gap: 6px !important; }
+.fr-add input { flex: 1; min-width: 0; }
+.fr-add .btn { padding: 8px 14px; }
+.fr-msg { margin: 0; font-size: 13px; color: var(--mute); min-height: 0; }
+.fr-msg:empty, .friends .acc-error:empty { display: none; }
+.friends .acc-error { margin: 0; }
+.fr-sec { margin-top: 14px; }
+.fr-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.fr-list li {
+  display: flex; align-items: center; gap: 8px;
+  border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px 6px 10px; text-align: left;
+}
+.fr-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 14px; }
+.fr-name a { color: inherit; text-underline-offset: 3px; }
+.fr-list .link { font-size: 12px; padding: 4px; }
+.btn.sm { padding: 5px 10px; font-size: 11px; }
+.fr-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line); flex: none; }
+.fr-dot.on { background: var(--online); box-shadow: 0 0 6px var(--online); }
+
+/* Header button */
+.acct-friends { position: relative; }
+.acct-badge {
+  position: absolute; top: -6px; right: -6px; min-width: 16px; height: 16px; padding: 0 4px;
+  border-radius: 8px; background: var(--accent); color: #fff; font-size: 10px; line-height: 16px; font-style: normal;
+}
+
+/* Invite toasts, top right under the header */
+.invites {
+  position: fixed; top: 56px; right: 12px; z-index: 50;
+  display: flex; flex-direction: column; gap: 8px; width: min(320px, calc(100vw - 24px));
+}
+.invite {
+  background: var(--bg); border: 1px solid var(--accent); border-radius: 8px; padding: 10px 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .5); animation: dlg-in .18s ease-out;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.invite p { margin: 0; }
+.invite small { color: var(--mute); font-family: var(--mono); font-size: 12px; }
+.invite .row { justify-content: flex-start; gap: 6px; }
+.invite .err { color: var(--accent); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { .invite { animation: none; } }
+
+/* Online friends in the room bar */
+.pvp-friends { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.pvp-friends li { display: flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 14px; padding: 2px 4px 2px 10px; font-family: var(--mono); font-size: 13px; }
+.pvp-friends button { padding: 2px 8px; font-size: 12px; border-radius: 12px; }
+.pvp-friends .st { color: var(--mute); font-size: 12px; padding-right: 6px; font-family: var(--sans); }

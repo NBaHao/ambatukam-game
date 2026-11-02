@@ -85,6 +85,11 @@ API (`backend/src/app/routers/`, tài liệu OpenAPI ở `/api/docs`):
 | `POST /api/rooms` `{ mode, duration, pid, name }` | Create a PvP room: `{ code, ticket }` |
 | `POST /api/rooms/{code}/join` `{ pid, name }` | Ticket to join a room |
 | `GET /api/rooms/{code}/ws?ticket=` | WebSocket to the room (Durable Object) |
+| `GET /api/friends` | Logged in: friends, requests to me, requests I sent |
+| `POST /api/friends/{username}` | Send a friend request, or accept theirs: `{ relation }` |
+| `DELETE /api/friends/{username}` | Unfriend, cancel or decline |
+| `POST /api/lobby` `{ pid, name }` | Ticket for the lobby socket |
+| `GET /api/lobby/ws?ticket=` | WebSocket to the lobby (Durable Object): friends online, PvP invites, matchmaking |
 
 ## Accounts
 
@@ -116,6 +121,21 @@ wins / losses / draws and the latest 20 matches (opponents who played logged in 
 Open it from the account menu (**My profile**), a ✓ name on the leaderboard, or the opponent's name in a
 PvP result. Guests have no profile. The API returns no player ids, email or sign-in data.
 
+## Friends
+
+Accounts can be friends (guests can't): **Friends** in the header (with a badge for new requests and the
+number of friends online), or the button on someone's profile. A request waits until the other side
+accepts (or sends one back); either side can remove it. Up to `MAX_FRIENDS` (200) friends and
+`MAX_FRIEND_REQUESTS` (50) unanswered requests.
+
+Presence and invites go through one global Durable Object (`Lobby`, `backend/src/lobby_room.py`). Every
+logged-in tab keeps a WebSocket to it (ticket from `POST /api/lobby`); an account is online while it has
+at least one, and only its friends are told when that changes. **Challenge** next to an online friend
+opens the PvP setup and sends them an invite as soon as the room exists; while waiting in a room, online
+friends are listed with an **Invite** button. The invitee gets a toast: **Accept** joins the room,
+**Decline** tells the host. Friend lists come from D1 on each check (nothing cached); keep-alive pings
+are answered by the runtime without waking the object.
+
 ## PvP
 
 1v1 through a challenge link, both players on one clock:
@@ -128,6 +148,11 @@ PvP result. Guests have no profile. The API returns no player ids, email or sign
    (clock offset measured with ping/pong, lowest round-trip wins). Each side sees the other's live count.
 4. When time is up each client sends its run; the server decides win / loss / draw, then **Rematch**
    or **Leave**. The room keeps the match score until someone else takes an empty seat.
+
+**Find a random opponent** (same PvP screen) waits in a queue instead: the first player who picks the
+same mode and time is paired with you, guests included. The queue lives in the `Lobby` Durable Object
+(each waiting socket carries its board in its attachment, so it survives hibernation); when two match,
+the lobby makes a room code and sends each a ticket that can open the room, whoever connects first.
 
 How it works: each room is a Durable Object (`PvpRoom`, `backend/src/pvp_room.py`) holding the
 WebSockets (hibernation API) and the state; the rules are plain Python in
@@ -229,7 +254,7 @@ Nhảy thẳng tới một màn hình để xem giao diện, thêm `mode=single|
 ## Ý tưởng tiếp theo
 
 - Rank: chống gian lận chặt hơn bằng chuỗi thời điểm từng lọ
-- PvP: matchmaking với người lạ, video/voice qua WebRTC
+- PvP: video/voice qua WebRTC
 - Rhythm: xóc theo nhịp nhạc
 
 ## License
@@ -240,9 +265,9 @@ MIT
 
 ## English
 
-Webcam meme game: grip like you're holding a rod, stroke up and down as fast as you can. Three modes: **Single** (1 hand, timed, average strokes/sec), **Double** (2 hands, 2 rods, strokes add up), **Random** (the rod spawns at random spots and keeps relocating; chase it to keep your Heat meter up, survive as long as you can). **PvP**: send a challenge link and race a friend on the same clock. Rank is coming soon.
+Webcam meme game: grip like you're holding a rod, stroke up and down as fast as you can. Three modes: **Single** (1 hand, timed, average strokes/sec), **Double** (2 hands, 2 rods, strokes add up), **Random** (the rod spawns at random spots and keeps relocating; chase it to keep your Heat meter up, survive as long as you can). **PvP**: send a challenge link, challenge an online friend, or get paired with a random opponent, and race on the same clock. Accounts get a public profile and a friend list. Rank is coming soon.
 
-Hand tracking runs entirely in the browser; video never leaves the device. The only backend is the leaderboard (Cloudflare Workers + D1), which receives just a name and a score. For fun, 16+, no explicit imagery.
+Hand tracking runs entirely in the browser; video never leaves the device. The backend (Cloudflare Workers + D1 + Durable Objects) only handles the leaderboard, accounts, friends and PvP rooms; it receives names, scores and stroke counts, never video. For fun, 16+, no explicit imagery.
 
 **Play online:** https://ambatukam.bahao.site
 

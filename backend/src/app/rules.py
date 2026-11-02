@@ -52,6 +52,13 @@ PVP_EARLY_SLACK_MS = 1_500  # a final result may arrive this much before time's 
 PVP_PROGRESS_GAP_SEC = 3  # final strokes may exceed the last live progress by this many seconds' worth
 PVP_HISTORY_N = 20
 
+# Friends and the lobby (presence, invites)
+MAX_FRIENDS = 200
+MAX_FRIEND_REQUESTS = 50  # pending requests one account has sent
+LOBBY_TICKET_SEC = 6 * 3600
+LOBBY_INVITE_GAP_MS = 2_000  # one PvP invite per player per 2 s
+LOBBY_QUEUE_GAP_MS = 1_000  # one matchmaking request per connection per second
+
 # Random: Lửa bắt đầu 100% (tối đa 100%), cạn (10 + 0.4·t)%/giây, mỗi nhát nạp 5%
 RND_START = 100
 RND_DRAIN = 10
