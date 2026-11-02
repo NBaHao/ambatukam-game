@@ -53,7 +53,7 @@ def test_reset_flow(client: TestClient, outbox: list[Email], fake_clock: FakeClo
     assert other.get("/api/me").json()["user"]["username"] == "haro"
 
     res = ask(client, lang="vi")
-    assert res.status_code == 200 and res.json() == {"available": True}
+    assert res.status_code == 200 and res.json() == {"retry_in": 120}
     assert len(outbox) == 1
     mail = outbox[0]
     assert mail.to == "me@example.com" and "Đặt lại" in mail.subject and "haro" in mail.text
@@ -79,8 +79,8 @@ def test_reset_flow(client: TestClient, outbox: list[Email], fake_clock: FakeClo
 
 def test_same_answer_for_unknown_or_emailless_accounts(client: TestClient, outbox: list[Email]):
     register(client)  # no email
-    assert ask(client).json() == {"available": True}
-    assert ask(client, "nobody").json() == {"available": True}
+    assert ask(client).json() == {"retry_in": 120}
+    assert ask(client, "nobody").json() == {"retry_in": 120}
     assert outbox == []
 
 
@@ -146,3 +146,11 @@ def test_email_html_escapes_name():
     mail = reset_email("a@b.co", "<x>", "https://e.x/reset/t", "en")
     assert "<x>" not in mail.html and "&lt;x&gt;" in mail.html
     assert 'href="https://e.x/reset/t"' in mail.html
+
+
+def test_email_has_both_languages_and_a_text_part():
+    en = reset_email("a@b.co", "haro", "https://e.x/reset/t", "en")
+    vi = reset_email("a@b.co", "haro", "https://e.x/reset/t", "vi")
+    assert "Choose a new password" in en.html and "Chọn mật khẩu mới" in vi.html
+    assert '<html lang="vi">' in vi.html and "30" in vi.text
+    assert "https://e.x/reset/t" in en.text and "e.x" in en.text.split("\n")[-1]

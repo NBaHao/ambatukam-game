@@ -60,7 +60,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
 
   const requestReset = useCallback<Account["requestReset"]>(async (username, lang, captchaEl) => {
     const captcha = await getCaptchaToken(captchaEl);
-    await api.resetRequest({ username, captcha, lang });
+    return (await api.resetRequest({ username, captcha, lang })).retry_in;
   }, []);
 
   const completeReset = useCallback<Account["completeReset"]>(

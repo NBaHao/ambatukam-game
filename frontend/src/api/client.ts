@@ -8,6 +8,7 @@ import type {
   Profile,
   RankResponse,
   RegisterRequest,
+  ResetSentResponse,
   Relation,
   RoomTicket,
   ScoreRequest,
@@ -59,9 +60,8 @@ export const api = {
   login: (body: LoginRequest) => post<MeResponse>("/api/auth/login", body),
   logout: () => post<MeResponse>("/api/auth/logout", {}),
   // Password reset by email (off when the server has no email service)
-  resetAvailable: () => request<{ available: boolean }>("/api/auth/reset").then((d) => d.available),
   resetRequest: (body: { username: string; captcha: string; lang: string }) =>
-    post<{ available: boolean }>("/api/auth/reset/request", body),
+    post<ResetSentResponse>("/api/auth/reset/request", body),
   resetComplete: (body: { token: string; password: string }) => post<MeResponse>("/api/auth/reset", body),
   changeEmail: (body: { email: string | null; password: string }) =>
     request<MeResponse>("/api/me/email", {

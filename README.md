@@ -83,7 +83,7 @@ API (`backend/src/app/routers/`, tài liệu OpenAPI ở `/api/docs`):
 | `GET /api/me` | The logged-in account (or `null`), renews the session |
 | `PUT /api/me/email` `{ email \| null, password }` | Add, change or remove the reset email (needs the current password) |
 | `GET /api/auth/reset` | `{ available }`: whether reset emails can be sent |
-| `POST /api/auth/reset/request` `{ username, captcha, lang }` | Email a reset link if the account has an email (same answer either way) |
+| `POST /api/auth/reset/request` `{ username, captcha, lang }` | Email a reset link if the account has an email (same answer either way: `{ retry_in }` seconds before asking again) |
 | `POST /api/auth/reset` `{ token, password }` | New password from the link: logs out every device, logs this one in |
 | `GET /api/users/{username}` | Public profile: best score per board with rank, PvP totals, latest 20 matches |
 | `POST /api/rooms` `{ mode, duration, pid, name }` | Create a PvP room: `{ code, ticket }` |

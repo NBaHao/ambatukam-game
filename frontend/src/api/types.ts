@@ -51,6 +51,12 @@ export interface User {
   email?: string | null;
 }
 
+/** POST /api/auth/reset/request: the same answer whether or not an email went out */
+export interface ResetSentResponse {
+  /** seconds before asking again can send another email (RESET_GAP_SEC in rules.py) */
+  retry_in: number;
+}
+
 export interface MeResponse {
   user: User | null;
 }
