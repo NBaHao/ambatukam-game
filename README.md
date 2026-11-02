@@ -85,6 +85,7 @@ API (`backend/src/app/routers/`, tài liệu OpenAPI ở `/api/docs`):
 | `POST /api/rooms` `{ mode, duration, pid, name }` | Create a PvP room: `{ code, ticket }` |
 | `POST /api/rooms/{code}/join` `{ pid, name }` | Ticket to join a room |
 | `GET /api/rooms/{code}/ws?ticket=` | WebSocket to the room (Durable Object) |
+| `POST /api/rooms/{code}/ice` `{ ticket }` | ICE / TURN servers for video and voice (503 `rtc_unavailable` if not set up) |
 | `GET /api/friends` | Logged in: friends, requests to me, requests I sent |
 | `POST /api/friends/{username}` | Send a friend request, or accept theirs: `{ relation }` |
 | `DELETE /api/friends/{username}` | Unfriend, cancel or decline |
@@ -166,7 +167,15 @@ for the time elapsed and never go down, the final run must not arrive before GO 
 pass the same checks as a leaderboard run and can't be far above the last live count. A run that fails
 counts as a loss (shown as "didn't count"); a player who sends nothing by GO + duration + 15 s forfeits.
 Each round is stored in D1 (`matches`, `match_players`) for profiles and history.
-PvP runs don't go to the leaderboard. No video or audio is exchanged.
+PvP runs don't go to the leaderboard.
+
+**Video / voice (optional).** In a room each player sees the opponent as a mascot tile. **Show my camera**
+and **Voice chat** are opt-ins, off by default and reset on every connection: a kind of media only flows
+when *both* players turned it on (the room refuses to relay WebRTC signaling otherwise), so a stranger
+never sees your face unless you agreed too. Media is peer to peer through Cloudflare's TURN relay
+(`iceTransportPolicy: "relay"`), so players never learn each other's IP address; video is capped at
+~350 kbps / 24 fps. The toggles only appear when the Worker has TURN credentials
+(`TURN_KEY_ID`, `TURN_KEY_API_TOKEN`; `POST /api/rooms/{code}/ice` hands them out to players of that room).
 
 ## Cách chơi
 
@@ -254,7 +263,6 @@ Nhảy thẳng tới một màn hình để xem giao diện, thêm `mode=single|
 ## Ý tưởng tiếp theo
 
 - Rank: chống gian lận chặt hơn bằng chuỗi thời điểm từng lọ
-- PvP: video/voice qua WebRTC
 - Rhythm: xóc theo nhịp nhạc
 
 ## License

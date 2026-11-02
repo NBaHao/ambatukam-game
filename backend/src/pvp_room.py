@@ -5,9 +5,10 @@ the room state lives in DO storage (one JSON value) and each socket carries a sm
 (pid + connection id). All game rules are in app/services/room.py; this file only does I/O.
 
 Client → server: {"t": "ping", "c": ms} | {"t": "ready", "v": bool} | {"t": "progress", "n": int}
-                 | {"t": "final", ...PvpFinal}
+                 | {"t": "final", ...PvpFinal} | {"t": "media", "cam": bool, "mic": bool}
+                 | {"t": "signal", "d": {...}} (WebRTC offer / answer / candidate)
 Server → client: {"t": "state", ...} | {"t": "progress", "seat", "n"} | {"t": "result", ...}
-                 | {"t": "pong", "c", "s"} | {"t": "error", "code"}
+                 | {"t": "signal", "d"} | {"t": "pong", "c", "s"} | {"t": "error", "code"}
 """
 
 import contextlib
@@ -25,7 +26,7 @@ from app.db import MatchRepository
 from app.services import room as logic
 from app.services import tickets
 
-MAX_MESSAGE = 4096
+MAX_MESSAGE = 16384  # a WebRTC offer (SDP) can take a few KB
 # Live counts arrive 4 times a second per player: keep them in memory and write them to storage at most this
 # often (the object stays in memory while messages flow; storage writes count against the quota)
 PROGRESS_SAVE_MS = 2000
@@ -141,8 +142,13 @@ class PvpRoom(DurableObject):
             flagged = len((room.state.get("match") or {}).get("flags", {})) != flags
             await self._commit(room, outs, lazy=not flagged)
             return
+        if kind == "signal":
+            self._send(room.signal(pid, cid, msg.get("d")))  # nothing to store
+            return
         if kind == "ready":
             outs = room.set_ready(pid, cid, msg.get("v"), now)
+        elif kind == "media":
+            outs = room.set_media(pid, cid, msg.get("cam"), msg.get("mic"), now)
         elif kind == "final":
             outs = room.final(pid, cid, msg, now)
         else:
