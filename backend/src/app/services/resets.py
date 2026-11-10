@@ -5,6 +5,7 @@ Using it sets the new password, ends every session of the account and logs this 
 """
 
 import html
+import json
 import secrets
 from typing import Any
 
@@ -24,6 +25,8 @@ _TEXT = {
         "hi": "Hi {name},",
         "intro": "Someone (hopefully you) asked to reset the password of your Ambatukam account {name}.",
         "button": "Choose a new password",
+        "action": "Reset password",
+        "action_desc": "Choose a new password for your Ambatukam account",
         "ttl": "The link works for {ttl} minutes and only once.",
         "fallback": "Button not working? Paste this link into your browser:",
         "ignore": "Didn't ask for this? Ignore this email: your password stays the same.",
@@ -35,6 +38,8 @@ _TEXT = {
         "hi": "Chào {name},",
         "intro": "Có người (hy vọng là bạn) muốn đặt lại mật khẩu tài khoản Ambatukam {name} của bạn.",
         "button": "Chọn mật khẩu mới",
+        "action": "Đặt lại mật khẩu",
+        "action_desc": "Chọn mật khẩu mới cho tài khoản Ambatukam",
         "ttl": "Link dùng được {ttl} phút và chỉ một lần.",
         "fallback": "Nút không bấm được? Dán link này vào trình duyệt:",
         "ignore": "Không phải bạn yêu cầu? Cứ bỏ qua email này: mật khẩu vẫn giữ nguyên.",
@@ -52,6 +57,22 @@ _DARK = """@media (prefers-color-scheme: dark) {
   .fg { color:#f4f4f5 !important; } .mute, .mute a { color:#a1a1aa !important; }
   .line { background:#2e2e33 !important; }
 }"""
+
+
+def _gmail_action(s: dict[str, str], link: str, site: str) -> str:
+    """Gmail "Go-To Action" (schema.org ViewAction): a quick button beside the email in the inbox list.
+    Gmail only shows it for senders registered with Google (SPF + DKIM, enough volume); other clients
+    ignore it. https://developers.google.com/workspace/gmail/markup/reference/go-to-action"""
+    data = {
+        "@context": "http://schema.org",
+        "@type": "EmailMessage",
+        "potentialAction": {"@type": "ViewAction", "url": link, "name": s["action"]},
+        "description": s["action_desc"],
+        "publisher": {"@type": "Organization", "name": "Ambatukam", "url": site},
+    }
+    # "<" as \u003c: no "</script>" can end the block early, whatever the link holds.
+    body = json.dumps(data, ensure_ascii=False).replace("<", "\\u003c")
+    return f'<script type="application/ld+json">{body}</script>'
 
 
 def reset_email(to: str, name: str, link: str, lang: str) -> Email:
@@ -74,7 +95,8 @@ def _html(s: dict[str, str], name: str, link: str, site: str, lang: str) -> str:
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark">
 <title>{e(s["subject"])}</title>
-<style>{_DARK}</style></head>
+<style>{_DARK}</style>
+{_gmail_action(s, link, site)}</head>
 <body style="margin:0;padding:0">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0">{e(s["preview"])}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
