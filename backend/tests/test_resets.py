@@ -1,5 +1,6 @@
 """Password reset by email (/api/auth/reset*) and changing the account's email (/api/me/email)."""
 
+import json
 import re
 
 import pytest
@@ -154,3 +155,25 @@ def test_email_has_both_languages_and_a_text_part():
     assert "Choose a new password" in en.html and "Chọn mật khẩu mới" in vi.html
     assert '<html lang="vi">' in vi.html and "30" in vi.text
     assert "https://e.x/reset/t" in en.text and "e.x" in en.text.split("\n")[-1]
+
+
+def gmail_action(mail: Email) -> dict:
+    m = re.search(r'<script type="application/ld\+json">(.*?)</script>', mail.html, re.S)
+    assert m, mail.html
+    return json.loads(m.group(1))
+
+
+@pytest.mark.parametrize(("lang", "label"), [("en", "Reset password"), ("vi", "Đặt lại mật khẩu")])
+def test_email_has_gmail_quick_action(lang: str, label: str):
+    mail = reset_email("a@b.co", "haro", "https://e.x/reset/t", lang)
+    data = gmail_action(mail)
+    assert data["@type"] == "EmailMessage"
+    assert data["potentialAction"] == {"@type": "ViewAction", "url": "https://e.x/reset/t", "name": label}
+    assert data["publisher"]["url"] == "https://e.x"
+    assert mail.html.index("application/ld+json") < mail.html.index("</head>")
+
+
+def test_gmail_action_cannot_break_out_of_its_script():
+    mail = reset_email("a@b.co", "haro", "https://e.x/reset/</script><b>x", "en")
+    assert mail.html.count("</script>") == 1
+    assert gmail_action(mail)["potentialAction"]["url"] == "https://e.x/reset/</script><b>x"
