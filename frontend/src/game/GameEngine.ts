@@ -379,6 +379,7 @@ export class GameEngine {
     const tilt = ((Math.random() * 2 - 1) * RND_TILT_MAX * Math.PI) / 180;
     tr.anchor = { x, y, size: this.refSize, ux: Math.sin(tilt), uy: Math.cos(tilt) };
     tr.clearMotion();
+    tr.fx.spawn();
     tr.invalidSince = null;
     this.run.rodSpawnAt = performance.now();
     this.run.rodHasStroke = false;
@@ -401,6 +402,7 @@ export class GameEngine {
     if (this.timed && sec >= this.config.duration) return; // hết giờ nhưng chưa kịp sang màn kết quả
     r.count++;
     tr.count++;
+    tr.fx.score(performance.now());
     while (r.bins.length <= sec) r.bins.push(0);
     r.bins[sec]++;
     if (this.config.mode === "random") {
@@ -498,6 +500,7 @@ export class GameEngine {
       const h = seen[i];
       if (!h) return;
       const rev = tr.anchor ? tr.feed(tr.rodCoords(h, aspect, tr.anchor).along, tr.anchor.size) : tr.feed(h.y, h.size);
+      if (rev && tr.anchor) tr.fx.kick(rev === "bottom" ? "bottom" : "top");
       if (rev === "bottom") this.onStroke(tr, now);
       else if (rev === "top") beep(330, 30, 0.03);
     });
@@ -546,7 +549,9 @@ export class GameEngine {
     // Nhận diện chậm (CPU trên điện thoại ~40ms/khung) mà để video chạy riêng thì chấm trễ hẳn sau tay lúc xóc.
     const hasFrame = (this.video?.readyState ?? 0) >= 2;
     if (hasFrame) this.frameDrawnAt = performance.now();
-    const spawnAge = this.config.mode === "random" ? (performance.now() - this.run.rodSpawnAt) / 500 : null;
+    const now = performance.now();
+    const spawnAge = this.config.mode === "random" ? (now - this.run.rodSpawnAt) / 500 : null;
+    if (active) for (const tr of this.tracks) tr.fx.update(tr.smooth, now);
     drawOverlay(this.octx, {
       frame: hasFrame ? this.frame : null,
       tracks: this.tracks,
@@ -554,6 +559,7 @@ export class GameEngine {
       progress,
       showRods: active,
       spawnAge,
+      now,
     });
   }
 
@@ -677,6 +683,7 @@ export class GameEngine {
       text:
         `${d.delegate ?? "-"} · video ${v?.videoWidth}x${v?.videoHeight} · ${d.fps} fps · hands ${d.hands}` +
         (d.size ? ` · size ${d.size.toFixed(2)}` : "") +
+        ` · travel ${this.tracks.map((tr) => `${Math.round(tr.travelShare * 100)}%`).join(" / ")}` +
         (d.error ? `\n${d.error}` : ""),
     });
   }

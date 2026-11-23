@@ -3,11 +3,13 @@ export const MAX_RATE = 6; // nhát/giây ứng với thanh lực đầy
 export const RATE_WINDOW_MS = 1500; // cửa sổ tính tốc độ tức thời
 export const LOST_HAND_MS = 400; // mất tay quá lâu thì reset bộ đếm hướng
 export const STROKE_THR = 0.25; // ngưỡng đảo chiều = 25% cỡ bàn tay
+export const STROKE_MIN_TRAVEL = 0.4; // a stroke scores only if the way down covers this share of the rod's length
 export const PALM_HOLD_MS = 1000; // xòe tay giữ bao lâu thì "sẵn sàng"
 export const ANCHOR_HOLD_MS = 1000; // nắm trụ giữ yên bao lâu thì đặt điểm neo
 export const ANCHOR_STILL = 0.35; // khi đặt neo, tay không được lệch quá 35% cỡ tay
 export const ROD_HALF_LEN = 1.8; // nửa chiều dài trụ (theo cỡ tay)
 export const ROD_TOL_X = 0.9; // tay được lệch ngang khỏi trục trụ bao nhiêu (theo cỡ tay)
+export const ROD_OVERSHOOT = 0.25; // the hand may run past each end of the rod by this share of its half length
 export const ROD_MAX_HALF = 0.3; // nửa trụ không dài quá 30% chiều cao khung: điện thoại để gần, tay to, trụ tràn khung
 export const INVALID_GRACE_MS = 150; // tay sai tư thế / lệch trụ quá lâu thì nhát đang dở bị huỷ
 export const GRIP_MAX_AVG = 1.45; // trung bình độ duỗi 4 ngón dưới mức này = đang nắm (để đặt neo)

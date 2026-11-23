@@ -8,9 +8,12 @@ import {
   RELEASE_FINGERS,
   ROD_HALF_LEN,
   ROD_MAX_HALF,
+  ROD_OVERSHOOT,
   ROD_TOL_X,
+  STROKE_MIN_TRAVEL,
   STROKE_THR,
 } from "./constants";
+import { RodFx } from "./RodFx";
 import { StrokeDetector, type Reversal } from "./StrokeDetector";
 import type { Anchor, HandPose, Landmarks } from "./types";
 
@@ -32,6 +35,7 @@ export const rodScale = (a: Anchor) => Math.min(a.size, ROD_MAX_HALF / ROD_HALF_
  */
 export class HandTrack {
   readonly detector = new StrokeDetector();
+  readonly fx = new RodFx(); // rubber look of this hand's rod (visual only)
   count = 0;
   hand: HandPose | null = null; // kết quả analyze của khung gần nhất (giữ lại trong LOST_HAND_MS)
   lastAt = 0;
@@ -39,6 +43,7 @@ export class HandTrack {
   curlEma: number[] | null = null;
   anchor: Anchor | null = null;
   onRod = false;
+  travelShare = 0; // latest way down as a share of the rod's length (diagnostics)
   invalidSince: number | null = null;
   anchorRef: { x: number; y: number } | null = null; // vị trí lúc bắt đầu giữ yên
   axisEma: { ux: number; uy: number } | null = null;
@@ -105,7 +110,7 @@ export class HandTrack {
     if (!this.anchor || h.released) return false;
     const { along, perp } = this.rodCoords(h, aspect, this.anchor);
     const r = rodScale(this.anchor);
-    return perp < r * ROD_TOL_X && Math.abs(along) < r * ROD_HALF_LEN;
+    return perp < r * ROD_TOL_X && Math.abs(along) < r * ROD_HALF_LEN * (1 + ROD_OVERSHOOT);
   }
 
   /** Cập nhật trục tay làm mượt trong lúc giữ yên; lật dấu nếu khung này ngược với trung bình */
@@ -137,10 +142,16 @@ export class HandTrack {
     this.clearMotion();
   }
 
-  /** Đưa một mẫu toạ độ vào bộ đếm. Trả về "bottom" (một nhát), "top" hoặc null. */
+  /** Đưa một mẫu toạ độ vào bộ đếm. Trả về "bottom" (một nhát), "short" (too small to score), "top" hoặc null. */
   feed(v: number, size: number): Reversal {
     this.smooth = this.smooth === null ? v : this.smooth * 0.35 + v * 0.65;
-    return this.detector.push(this.smooth, Math.max(0.015, size * STROKE_THR));
+    // Travel is a share of the drawn rod's length (before a rod exists: of the rod this hand would get)
+    const rodLen = (this.anchor ? rodScale(this.anchor) : size) * ROD_HALF_LEN * 2;
+    const travel = rodLen * STROKE_MIN_TRAVEL;
+    // Raw position for the travel: smoothing shaves a fast stroke's turning points, the full length would never register
+    const rev = this.detector.push(this.smooth, Math.max(0.015, size * STROKE_THR), travel, v);
+    if (rev === "bottom" || rev === "short") this.travelShare = this.detector.lastTravel / rodLen;
+    return rev;
   }
 }
 
