@@ -35,7 +35,9 @@ Hand tracking runs entirely in your browser, and your video never leaves your de
 2. **Open your palm** for 1 s to get ready.
 3. **Make a fist** and hold still for 1 s. The game places a virtual rod in your hand, tilted the way
    you grip it. In Double, grip with both hands. In Random, the rod appears on its own.
-4. After 3-2-1, **stroke along the rod**. A stroke only counts while your fist stays on the rod.
+4. After 3-2-1, **stroke along the rod**. A stroke only counts while your fist stays on the rod
+   and runs at least 40% of its length; going a little past either end is fine. The rod flashes
+   green on every counted stroke.
 5. The result shows your speed, rank title and record. Submit it to the leaderboard, save a
    1080×1080 image, or open your palm for 1 s to play again.
 
